@@ -1,0 +1,35 @@
+name: devguard
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-devguard}
+    ports:
+      # Host 5433 because 5432 is frequently occupied by a local Postgres.
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - devguard-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devguard} -d ${POSTGRES_DB:-devguard}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Local SMTP catch-all for alert emails (ADR-009). Nothing is delivered externally.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"   # SMTP
+      - "127.0.0.1:8025:8025"   # web inbox
+
+  # TODO(API-1): api service (build apps/api, depends_on db healthy)
+  # TODO(UI-1): dashboard service (build apps/dashboard)
+  # The agent is NOT containerised: it runs on the developer's machine against local Git repos.
+
+volumes:
+  devguard-db:

@@ -1,0 +1,22 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.turbo/
+
+# secrets and local config — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.devguard/
+
+# Claude Code local overrides
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+.idea/
+*.log

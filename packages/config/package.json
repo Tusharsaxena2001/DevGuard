@@ -1,0 +1,7 @@
+{
+  "name": "@devguard/config",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Shared TypeScript configuration for DevGuard workspaces",
+  "files": ["tsconfig.base.json"]
+}
