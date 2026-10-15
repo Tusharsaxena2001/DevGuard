@@ -2,7 +2,6 @@
 name: implement-module
 description: Implement exactly one bounded DevGuard module or vertical slice (e.g. SH-2, AG-3, API-6) with tests and doc updates. Use after the module has been planned.
 argument-hint: <module-id>
-disable-model-invocation: true
 ---
 
 # Implement a module

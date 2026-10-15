@@ -2,7 +2,6 @@
 name: plan-module
 description: Plan a DevGuard module (e.g. SH-2, AG-3, API-6, UI-5) before any code changes. Use when asked to plan, scope or prepare a module or vertical slice.
 argument-hint: <module-id>
-disable-model-invocation: true
 ---
 
 # Plan a module
