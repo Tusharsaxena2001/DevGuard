@@ -1,0 +1,26 @@
+{
+  "name": "@devguard/agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DevGuard endpoint agent: the `devguard` CLI, managed Git hook and local state",
+  "bin": {
+    "devguard": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "devguard": "node dist/main.js"
+  },
+  "dependencies": {
+    "@devguard/policy-engine": "workspace:*",
+    "@devguard/shared": "workspace:*",
+    "commander": "^15.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@devguard/config": "workspace:*"
+  }
+}
