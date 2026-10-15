@@ -9,13 +9,29 @@ const noIo = {
   message: "I/O belongs in adapters/ behind a port.",
 };
 const noOtherApps = {
-  group: ["**/apps/api/**", "**/apps/dashboard/**", "@devguard/api", "@devguard/dashboard", "**/../api/**", "**/../dashboard/**"],
+  group: ["**/apps/api/**", "**/apps/dashboard/**", "**/apps/agent/**", "@devguard/api", "@devguard/dashboard", "@devguard/agent", "**/../api/**", "**/../dashboard/**", "**/../agent/**"],
   message: "Apps never import other apps; share code through packages/.",
 };
 const noDynamicImport = {
   selector: "ImportExpression",
   message: "Dynamic import() would bypass the layer rules; use a static import.",
 };
+
+const noPrisma = {
+  group: ["@prisma/client", "@prisma/client/*", "@prisma/adapter-pg", "**/prisma/generated/**", "**/prisma/prisma.service*"],
+  message: "Prisma is used only in *.repository.ts (and src/prisma). Map to shared DTOs before leaving the repository.",
+};
+const noRepository = { group: ["**/*.repository", "**/*.repository.js"], message: "Controllers call services, never repositories." };
+const noOtherModuleRepository = {
+  group: ["../**/*.repository", "../**/*.repository.js"],
+  message: "Services call other modules' services, never their repositories (own repository: ./x.repository.js).",
+};
+
+/** Layer boundaries for apps/api (docs/architecture/engineering-standards.md). Test files and prisma/ (seed) are exempt. */
+const apiFiles = (files, patterns) => ({
+  files,
+  rules: { "no-restricted-imports": ["error", { patterns: [noOtherApps, ...patterns] }] },
+});
 
 /** Layer boundaries for apps/agent (docs/architecture/engineering-standards.md). `main.ts` is the composition root. */
 const agentLayer = (folder, patterns) => ({
@@ -27,7 +43,7 @@ const agentLayer = (folder, patterns) => ({
 });
 
 export default tseslint.config(
-  { ignores: ["**/dist/**", "**/node_modules/**", "**/coverage/**"] },
+  { ignores: ["**/dist/**", "**/node_modules/**", "**/coverage/**", "**/prisma/generated/**"] },
   ...tseslint.configs.recommended,
   {
     rules: {
@@ -35,6 +51,11 @@ export default tseslint.config(
       "@typescript-eslint/ban-ts-comment": ["error", { "ts-expect-error": "allow-with-description" }],
     },
   },
+  apiFiles(["apps/api/src/**/*.ts"], [noPrisma]),
+  apiFiles(["apps/api/src/**/*.controller.ts"], [noPrisma, noRepository]),
+  apiFiles(["apps/api/src/**/*.service.ts"], [noPrisma, noOtherModuleRepository]),
+  // Repositories and the Prisma wiring are the only places allowed to touch the client.
+  apiFiles(["apps/api/src/**/*.repository.ts", "apps/api/src/prisma/**/*.ts", "apps/api/src/**/*.test.ts"], []),
   agentLayer("cli", [noAdapters, noIo]),
   agentLayer("use-cases", [noAdapters, noCli, noCommander, noIo]),
   agentLayer("ports", [noAdapters, noCli, noCommander, noIo]),

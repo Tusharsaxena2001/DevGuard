@@ -20,12 +20,15 @@ Node >= 22, pnpm >= 10 (`corepack enable`), Docker with Compose v2, Git >= 2.30.
 ```bash
 git clone <repo> && cd dev-guard
 cp .env.example .env              # edit placeholders (never commit .env)
-pnpm install                      # (planned: once workspaces exist)
+pnpm install
 pnpm db:up                        # Postgres via Docker Compose on localhost:5433
 docker compose ps                 # wait for "healthy"
-pnpm --filter api prisma migrate deploy   # (planned: API-1)
-pnpm --filter api seed                    # (planned: API-1) synthetic demo data
-pnpm --filter api start:dev               # (planned: API-1) http://localhost:3000, docs at /docs
+set -a; . ./.env; set +a          # the Prisma CLI and seed read DATABASE_URL from the environment
+pnpm --filter @devguard/shared build
+pnpm --filter @devguard/api prisma:deploy # apply migrations (API-1)
+pnpm --filter @devguard/api seed          # synthetic demo data, idempotent; no usable credentials
+pnpm --filter @devguard/api start:dev     # http://localhost:3000, /health, OpenAPI at /docs
+# or run the API in a container: docker compose up -d api   (dev-only image; applies migrations at start)
 pnpm --filter dashboard dev               # (planned: UI-1) http://localhost:5173
 ```
 Stop infra: `pnpm db:down` (add `-v` to `docker compose down` to wipe local data).

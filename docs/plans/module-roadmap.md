@@ -25,7 +25,7 @@ Status: `todo` | `in-progress` | `done`. Update via `/implement-module`. Specs: 
 ## API (apps/api)
 | ID | Module | Depends on | Status |
 |----|--------|-----------|--------|
-| API-1 | Foundation (schema, migrations, seed, OpenAPI) | SH-1 | todo |
+| API-1 | Foundation (schema, migrations, seed, OpenAPI) | SH-1 | done |
 | API-2 | Auth, RBAC, device identity | API-1 | todo |
 | API-3 | Projects, assignments, canonical repos, fingerprints, destinations | API-2 | todo |
 | API-4 | Policies (versioned) + agent project sync | API-3 | todo |
@@ -49,7 +49,7 @@ Status: `todo` | `in-progress` | `done`. Update via `/implement-module`. Specs: 
 ## Cross-cutting
 | ID | Module | Status |
 |----|--------|--------|
-| X-1 | Docker Compose + dev setup | in-progress (Postgres compose done; api/dashboard services pending) |
+| X-1 | Docker Compose + dev setup | in-progress (Postgres, Mailpit and api compose services done; dashboard service pending) |
 | X-2 | E2E, hardening, demo, limitations | todo |
 
 ## Build order

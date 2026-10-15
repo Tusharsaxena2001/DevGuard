@@ -1,0 +1,289 @@
+// DevGuard API schema (API-1). No column stores credentials in plaintext, file contents or secret values:
+// credentials are hashes only, events carry rule ids / paths / destinations / decisions.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/prisma/generated"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Mirrors of @devguard/shared enums (kept equal by test/enums.test.ts).
+enum Role {
+  employee
+  team_lead
+  project_owner
+  security_admin
+}
+
+enum Classification {
+  internal
+  confidential
+  client_owned
+}
+
+enum EnforcementMode {
+  enforce
+  audit_only
+}
+
+enum Outcome {
+  allowed
+  blocked
+  error
+  exception
+}
+
+enum OperationType {
+  push
+  force_push
+  branch_create
+  branch_delete
+  tag_push
+}
+
+enum DeviceStatus {
+  active
+  revoked
+}
+
+enum ExceptionStatus {
+  pending
+  approved
+  rejected
+  expired
+  revoked
+}
+
+enum UserStatus {
+  active
+  disabled
+}
+
+enum DestinationType {
+  exact
+  owner_wildcard
+}
+
+enum DecisionKind {
+  approved
+  rejected
+  revoked
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  /// argon2id hash (API-2). Never a plaintext password.
+  passwordHash String
+  name         String
+  status       UserStatus @default(active)
+  createdAt    DateTime   @default(now())
+
+  memberships      Membership[]
+  devices          Device[]
+  enrollmentTokens EnrollmentToken[] @relation("TokenOwner")
+  ownedProjects    Project[]         @relation("ProjectOwner")
+}
+
+model Membership {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  role      Role
+  /// null = global role. Postgres treats NULLs as distinct, so global uniqueness is a partial index in the migration.
+  projectId String?  @db.Uuid
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role, projectId])
+  @@index([projectId])
+}
+
+model Device {
+  id           String       @id @default(uuid()) @db.Uuid
+  userId       String       @db.Uuid
+  name         String
+  os           String
+  agentVersion String
+  /// Hash of the per-device secret (ADR-006). The secret itself is never stored.
+  secretHash   String
+  status       DeviceStatus @default(active)
+  enrolledAt   DateTime     @default(now())
+  lastSeenAt   DateTime?
+  revokedAt    DateTime?
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  repoRegistrations RepoRegistration[]
+  securityEvents    SecurityEvent[]
+  exceptionRequests ExceptionRequest[]
+
+  @@index([userId])
+}
+
+model EnrollmentToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  /// Hash of the one-time token; the token is shown once at issue time and never stored.
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdBy String    @db.Uuid
+  createdAt DateTime  @default(now())
+
+  user User @relation("TokenOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Project {
+  id             String         @id @default(uuid()) @db.Uuid
+  name           String         @unique
+  classification Classification
+  ownerId        String         @db.Uuid
+  createdAt      DateTime       @default(now())
+
+  owner                User                  @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  memberships          Membership[]
+  repoRegistrations    RepoRegistration[]
+  approvedDestinations ApprovedDestination[]
+  policy               Policy?
+  securityEvents       SecurityEvent[]
+  exceptionRequests    ExceptionRequest[]
+}
+
+model RepoRegistration {
+  id              String   @id @default(uuid()) @db.Uuid
+  projectId       String   @db.Uuid
+  deviceId        String   @db.Uuid
+  /// Root-commit fingerprint (ADR-012): an identifier, not repo content.
+  repoFingerprint String
+  registeredAt    DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  device  Device  @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, repoFingerprint])
+  @@index([projectId])
+}
+
+model ApprovedDestination {
+  id        String          @id @default(uuid()) @db.Uuid
+  projectId String          @db.Uuid
+  /// Normalized host and repo path (exact matching only, security invariant 3).
+  host      String
+  repoPath  String
+  type      DestinationType @default(exact)
+  createdBy String          @db.Uuid
+  createdAt DateTime        @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, host, repoPath])
+}
+
+model Policy {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @unique @db.Uuid
+  createdAt DateTime @default(now())
+
+  project  Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions PolicyVersion[]
+}
+
+/// Immutable: UPDATE and DELETE are rejected by a trigger. The current version is the highest `version`.
+model PolicyVersion {
+  id             String          @id @default(uuid()) @db.Uuid
+  policyId       String          @db.Uuid
+  projectId      String          @db.Uuid
+  version        Int
+  mode           EnforcementMode
+  prohibitedGlobs String[]
+  /// Secret rule identifiers/config (Json), never secret values.
+  secretRules    Json
+  createdBy      String          @db.Uuid
+  createdAt      DateTime        @default(now())
+
+  policy Policy @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  @@unique([projectId, version])
+}
+
+model ExceptionRequest {
+  id          String          @id @default(uuid()) @db.Uuid
+  projectId   String          @db.Uuid
+  requesterId String          @db.Uuid
+  deviceId    String?         @db.Uuid
+  destHost    String
+  destRepo    String
+  reason      String
+  status      ExceptionStatus @default(pending)
+  eventId     String?         @db.Uuid
+  createdAt   DateTime        @default(now())
+
+  project   Project              @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  device    Device?              @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  decisions ExceptionDecision[]
+
+  @@index([projectId, status])
+}
+
+/// Decisions are history rows (API-6 may extend). Expiry is checked at validation time against `expiresAt`.
+model ExceptionDecision {
+  id        String       @id @default(uuid()) @db.Uuid
+  requestId String       @db.Uuid
+  deciderId String       @db.Uuid
+  decision  DecisionKind
+  reason    String
+  expiresAt DateTime?
+  decidedAt DateTime     @default(now())
+
+  request ExceptionRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+
+  @@index([requestId])
+}
+
+/// Metadata only: rule ids, secret type, paths, destination, refs, decision. No contents, diffs or secret values.
+model SecurityEvent {
+  id            String        @id @default(uuid()) @db.Uuid
+  occurredAt    DateTime
+  deviceId      String        @db.Uuid
+  userId        String        @db.Uuid
+  projectId     String?       @db.Uuid
+  destHost      String
+  destRepo      String
+  operation     OperationType
+  ruleIds       String[]
+  mode          EnforcementMode
+  outcome       Outcome
+  correlationId String
+  policyVersion Int?
+  exceptionId   String?       @db.Uuid
+  approverId    String?       @db.Uuid
+  receivedAt    DateTime      @default(now())
+
+  device  Device   @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, occurredAt])
+  @@index([deviceId, occurredAt])
+  @@index([outcome])
+  @@index([correlationId])
+}
+
+/// Append-only: UPDATE and DELETE are rejected by a trigger. `summary` is a redacted before/after summary.
+model AdminAuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  occurredAt DateTime @default(now())
+  actorId    String   @db.Uuid
+  action     String
+  targetType String
+  targetId   String
+  summary    Json
+
+  @@index([occurredAt])
+  @@index([targetType, targetId])
+}

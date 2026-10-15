@@ -27,7 +27,23 @@ services:
       - "127.0.0.1:1025:1025"   # SMTP
       - "127.0.0.1:8025:8025"   # web inbox
 
-  # TODO(API-1): api service (build apps/api, depends_on db healthy)
+  # Dev-only API container. Host port comes from API_PORT; inside the network the database is `db:5432`.
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      API_PORT: "3000"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-devguard}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-devguard}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      DASHBOARD_BASE_URL: ${DASHBOARD_BASE_URL:-http://localhost:5173}
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
   # TODO(UI-1): dashboard service (build apps/dashboard)
   # The agent is NOT containerised: it runs on the developer's machine against local Git repos.
 
