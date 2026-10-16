@@ -4,8 +4,7 @@ import { fail, ok } from "../result.js";
 import { cachedPolicy, cliDeps, fakeStore, recordingLogger, syntheticSecret, untouchableStore } from "../../test/support/fakes.js";
 import { runCli } from "./run.js";
 
-const PLANNED = ["enroll", "request-exception", "sync"];
-const REAL = ["status", "install", "uninstall"];
+const REAL = ["status", "install", "uninstall", "enroll", "sync", "request-exception", "exception"];
 
 describe("help and usage (no server, no local state needed)", () => {
   it("--help exits 0, lists the commands and hides the internal hook", async () => {
@@ -13,7 +12,7 @@ describe("help and usage (no server, no local state needed)", () => {
     expect(await runCli(["--help"], cliDeps({ store: untouchableStore(), logger }))).toBe(0);
     const help = logger.out.join("\n");
     const commands = help.slice(help.indexOf("Commands:"));
-    for (const name of [...REAL, ...PLANNED]) expect(commands).toMatch(new RegExp(`^\\s+${name}\\s`, "m"));
+    for (const name of REAL) expect(commands).toMatch(new RegExp(`^\\s+${name}\\s`, "m"));
     // The same pattern that must find real commands finds nothing for the internal hook entry point.
     expect(commands).not.toMatch(/^\s+hook\s/m);
   });
@@ -42,18 +41,17 @@ describe("help and usage (no server, no local state needed)", () => {
   });
 });
 
-describe("planned commands fail loudly", () => {
-  it.each(PLANNED.map((c) => [[c]]))("%j exits 2 and says it is unavailable", async (argv) => {
+describe("no command is a stub any more", () => {
+  it("request-exception needs its required options (usage error, exit 2, nothing touched)", async () => {
     const logger = recordingLogger();
-    const code = await runCli(argv, cliDeps({ store: untouchableStore(), logger }));
-    expect(code).toBe(2);
-    expect(logger.err.join(" ")).toContain("not available in this build yet");
+    expect(await runCli(["request-exception"], cliDeps({ store: untouchableStore(), logger }))).toBe(2);
+    expect(logger.err.join(" ")).toContain("required option");
   });
 
-  it("accepts and ignores extra arguments and options", async () => {
+  it("extra arguments are a usage error", async () => {
     const logger = recordingLogger();
-    expect(await runCli(["enroll", "--server", "https://x.example.com", "extra"], cliDeps({ store: untouchableStore(), logger }))).toBe(2);
-    expect(logger.err.join(" ")).toContain("not available");
+    expect(await runCli(["sync", "extra"], cliDeps({ store: untouchableStore(), logger }))).toBe(2);
+    expect(logger.err.join(" ")).toContain("too many arguments");
   });
 });
 

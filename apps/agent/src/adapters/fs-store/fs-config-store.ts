@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { AgentError } from "../../errors.js";
 import { fail, ok } from "../../result.js";
@@ -71,6 +71,15 @@ export function createFsConfigStore(home: string): ConfigStore {
       const { projectId } = policy.project;
       if (!isSafeProjectId(projectId)) throw new AgentError("store_write_failed", "Refusing to cache a policy for an unsafe project id.");
       await writeJsonFile(policyFile(projectId), CachedPolicySchema, policy);
+    },
+
+    async deletePolicy(projectId: string): Promise<void> {
+      if (!isSafeProjectId(projectId)) throw new AgentError("store_write_failed", "Refusing to remove a policy for an unsafe project id.");
+      try {
+        await rm(policyFile(projectId), { force: true });
+      } catch (cause) {
+        throw new AgentError("store_write_failed", "DevGuard could not remove an outdated cached policy.", { cause });
+      }
     },
   };
 }

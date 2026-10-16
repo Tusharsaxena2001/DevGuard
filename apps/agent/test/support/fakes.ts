@@ -61,6 +61,7 @@ export function fakeStore(
     writeCredentials: async () => undefined,
     writeRepos: async () => undefined,
     writePolicy: async () => undefined,
+    deletePolicy: async () => undefined,
   };
 }
 
@@ -82,14 +83,17 @@ export function untouchableStore(): ConfigStore {
     writeCredentials: boom,
     writeRepos: boom,
     writePolicy: boom,
+    deletePolicy: boom,
   };
 }
 
 // ---- Git, hook files, event sink, deps ---------------------------------------------------------------------
 
-import type { SecurityEventInput } from "@devguard/shared";
+import type { EventBatchResult, ExceptionEntry, ExceptionPage, ExceptionValidationResult, SecurityEventBatch, SecurityEventInput } from "@devguard/shared";
 import type { CliDeps } from "../../src/cli/deps.js";
+import type { ApiClient, ApiResult, ProjectsReply } from "../../src/ports/api-client.js";
 import type { EventSink } from "../../src/ports/event-sink.js";
+import type { EventSpool } from "../../src/ports/event-spool.js";
 import type { AddedLineRecord, CommitBaseline, GitPort } from "../../src/ports/git.js";
 import type { ChangedFileStatus } from "../../src/ports/git-types.js";
 import type { HookFiles } from "../../src/ports/hook-files.js";
@@ -213,12 +217,102 @@ export function cliDeps(over: Partial<Omit<CliDeps, "setExitCode">> = {}): Omit<
     files: memoryHookFiles(),
     policyFile: { read: async () => ({ ok: false, reason: "unreadable" }) },
     events: memoryEvents(),
+    spool: memorySpool(),
     clock: fixedClock(),
+    api: fakeApi(),
+    hookApi: fakeApi(),
+    policyMaxStaleMinutes: 60,
+    device: { name: "test-laptop", os: "linux 6.0" },
     agent: { nodePath: "/usr/bin/node", mainPath: "/opt/devguard/main.js", version: "0.0.0" },
     newId: sequentialIds(),
     readStdin: async () => "",
     cwd: () => "/repo",
     userHome: "/home/dev",
     ...over,
+  };
+}
+
+// ---- API client ----------------------------------------------------------------------------------------------
+
+export interface FakeApi extends ApiClient {
+  readonly calls: { method: string; args: unknown[] }[];
+}
+
+/** Scripted API client: unscripted calls fail the test by reporting "unreachable" and recording nothing useful. */
+export function fakeApi(
+  script: {
+    enroll?: ApiResult<{ deviceId: string; deviceSecret: string }>;
+    heartbeat?: ApiResult<undefined>;
+    getProjects?: ApiResult<ProjectsReply>;
+    reportFingerprint?: ApiResult<undefined>;
+    sendEvents?: ApiResult<EventBatchResult> | ((batch: SecurityEventBatch) => ApiResult<EventBatchResult>);
+    requestException?: ApiResult<ExceptionEntry>;
+    listExceptions?: ApiResult<ExceptionPage>;
+    getException?: ApiResult<ExceptionEntry>;
+    validateException?: ApiResult<ExceptionValidationResult>;
+  } = {},
+): FakeApi {
+  const calls: { method: string; args: unknown[] }[] = [];
+  return {
+    calls,
+    enroll: async (...args) => {
+      calls.push({ method: "enroll", args });
+      return script.enroll ?? { ok: false, reason: "unreachable" };
+    },
+    heartbeat: async (...args) => {
+      calls.push({ method: "heartbeat", args });
+      return script.heartbeat ?? { ok: false, reason: "unreachable" };
+    },
+    getProjects: async (...args) => {
+      calls.push({ method: "getProjects", args });
+      return script.getProjects ?? { ok: false, reason: "unreachable" };
+    },
+    reportFingerprint: async (...args) => {
+      calls.push({ method: "reportFingerprint", args });
+      return script.reportFingerprint ?? { ok: false, reason: "unreachable" };
+    },
+    requestException: async (...args) => {
+      calls.push({ method: "requestException", args });
+      return script.requestException ?? { ok: false, reason: "unreachable" };
+    },
+    listExceptions: async (...args) => {
+      calls.push({ method: "listExceptions", args });
+      return script.listExceptions ?? { ok: false, reason: "unreachable" };
+    },
+    getException: async (...args) => {
+      calls.push({ method: "getException", args });
+      return script.getException ?? { ok: false, reason: "unreachable" };
+    },
+    validateException: async (...args) => {
+      calls.push({ method: "validateException", args });
+      return script.validateException ?? { ok: false, reason: "unreachable" };
+    },
+    sendEvents: async (...args) => {
+      calls.push({ method: "sendEvents", args });
+      const scripted = script.sendEvents;
+      if (typeof scripted === "function") return scripted(args[1]);
+      return scripted ?? { ok: false, reason: "unreachable" };
+    },
+  };
+}
+
+// ---- Event spool ---------------------------------------------------------------------------------------------
+
+export interface MemorySpool extends EventSpool {
+  readonly items: Map<string, SecurityEventInput>;
+}
+
+export function memorySpool(initial: SecurityEventInput[] = []): MemorySpool {
+  const items = new Map(initial.map((e) => [e.idempotencyKey, e]));
+  let dropped = 0;
+  return {
+    items,
+    add: async (event) => void items.set(event.idempotencyKey, event),
+    peek: async (limit) => [...items.values()].slice(0, limit).map((event) => ({ key: event.idempotencyKey, event })),
+    remove: async (keys) => void keys.forEach((k) => items.delete(k)),
+    discard: async (keys) => {
+      for (const k of keys) if (items.delete(k)) dropped += 1;
+    },
+    stats: async () => ({ pending: items.size, dropped }),
   };
 }

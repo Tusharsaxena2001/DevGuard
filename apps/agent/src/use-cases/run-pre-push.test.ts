@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SecurityEventInputSchema, type RefUpdate } from "@devguard/shared";
+import { SecurityEventInputSchema, type RefUpdate, type ValidException } from "@devguard/shared";
 import { fail, ok } from "../result.js";
 import { cachedPolicy, fakeGit, fakeStore, fixedClock, memoryEvents, sequentialIds, type GitScript } from "../../test/support/fakes.js";
 import type { StoreRead } from "../ports/config-store.js";
@@ -24,6 +24,8 @@ interface World {
   policyRead?: StoreRead<CachedPolicy>;
   reposRead?: StoreRead<RegisteredRepos>;
   eventsFail?: Error;
+  deps?: Partial<PrePushDeps>;
+  now?: string;
 }
 
 function world(w: World = {}) {
@@ -33,7 +35,7 @@ function world(w: World = {}) {
   const store = fakeStore({ repos }, { "proj-1": w.policyRead ?? ok(policy) });
   const events = memoryEvents(w.eventsFail);
   const git = fakeGit({ knownObjects: [B], ancestors: [`${B}>${A}`], commits: { [A]: [C1] }, ...w.git });
-  const deps: PrePushDeps = { store, git, events, clock: fixedClock(), newId: sequentialIds("id"), agentVersion: "9.9.9" };
+  const deps: PrePushDeps = { store, git, events, clock: fixedClock(w.now), newId: sequentialIds("id"), agentVersion: "9.9.9", maxStaleMinutes: 60, ...w.deps };
   const run = (input: string, url = OK_URL) => runPrePush({ remoteName: "origin", remoteUrl: url, stdin: input, cwd: "/repo" }, deps);
   return { run, events, git };
 }
@@ -85,7 +87,7 @@ describe("worktrees, empty pushes and policy age", () => {
     expect((await world().run("", OTHER_URL)).exitCode).toBe(1);
   });
 
-  it("policy age is deliberately not evaluated yet (ADR-004 staleness arrives with policy sync, AG-6): an old cached policy is still enforced", async () => {
+  it("a locally supplied policy (register --policy-file) never ages: it is still enforced years later", async () => {
     const w = world({ policy: (p) => void (p.fetchedAt = "2016-01-01T00:00:00.000Z") });
     expect((await w.run(update, OTHER_URL)).exitCode).toBe(1);
     expect((await w.run(update)).exitCode).toBe(0);
@@ -222,7 +224,7 @@ describe("enforce mode", () => {
 
   it("uses the remote name Git passed to find commits not already on the remote", async () => {
     const w = world();
-    await runPrePush({ remoteName: "upstream", remoteUrl: OK_URL, stdin: stdin(["refs/heads/new", A, "refs/heads/new", ZERO]), cwd: "/repo" }, { store: fakeStore({ repos: ok({ repos: [{ repoPath: "/repo", projectId: "proj-1", registeredAt: "2026-06-01T12:00:00.000Z" }] }) }, { "proj-1": ok(cachedPolicy("proj-1")) }), git: w.git, events: w.events, clock: fixedClock(), newId: sequentialIds(), agentVersion: "0" });
+    await runPrePush({ remoteName: "upstream", remoteUrl: OK_URL, stdin: stdin(["refs/heads/new", A, "refs/heads/new", ZERO]), cwd: "/repo" }, { store: fakeStore({ repos: ok({ repos: [{ repoPath: "/repo", projectId: "proj-1", registeredAt: "2026-06-01T12:00:00.000Z" }] }) }, { "proj-1": ok(cachedPolicy("proj-1")) }), git: w.git, events: w.events, clock: fixedClock(), newId: sequentialIds(), agentVersion: "0", maxStaleMinutes: 60 });
     expect(w.git.calls[0]?.args[1]).toEqual({ kind: "remote", name: "upstream" });
   });
 });
@@ -335,3 +337,201 @@ describe("never leaks", () => {
 });
 
 export type { RefUpdate };
+
+describe("policy freshness (ADR-004)", () => {
+  const server = (fetchedAt: string, mode: "enforce" | "audit_only" = "enforce") => ({
+    policy: (p: CachedPolicy) => {
+      p.source = "server";
+      p.fetchedAt = fetchedAt;
+      p.project.policy.mode = mode;
+    },
+  });
+  const NOW = "2026-06-01T12:00:00.000Z";
+
+  it.each([
+    ["fetched just now", "2026-06-01T11:58:00.000Z"],
+    ["fetched 59 minutes ago (stale but within the limit)", "2026-06-01T11:01:00.000Z"],
+  ])("enforces normally when the cached server policy was %s", async (_name, fetchedAt) => {
+    const w = world({ ...server(fetchedAt), now: NOW });
+    expect((await w.run(update)).exitCode).toBe(0);
+    expect((await w.run(update, OTHER_URL)).exitCode).toBe(1);
+    expect(w.events.events[0]?.ruleIds).toEqual([]);
+  });
+
+  it("blocks an enforced project whose server policy is past the limit, even for an approved destination, and says why", async () => {
+    const w = world({ ...server("2026-06-01T10:00:00.000Z"), now: NOW });
+    const out = await w.run(update);
+    expect(out.exitCode).toBe(1);
+    expect(out.lines.join("\n")).toContain("out of date");
+    expect(out.lines.join("\n")).toContain("devguard sync");
+    expect(w.events.events[0]).toMatchObject({ outcome: "blocked", ruleIds: ["policy_unavailable"], mode: "enforce", wouldBlock: true, projectId: "proj-1" });
+  });
+
+  it("allows and records an audit-only project whose server policy is past the limit", async () => {
+    const w = world({ ...server("2026-06-01T10:00:00.000Z", "audit_only"), now: NOW });
+    const out = await w.run(update, OTHER_URL);
+    expect(out.exitCode).toBe(0);
+    expect(out.lines.join("\n")).toContain("allowed and recorded");
+    expect(w.events.events[0]).toMatchObject({ outcome: "allowed", ruleIds: ["policy_unavailable"], mode: "audit_only", wouldBlock: true });
+  });
+
+  it.each([["a timestamp in the future", "2026-06-02T12:00:00.000Z"], ["an unparsable timestamp", "yesterday"]])("treats %s as expired (it cannot prove it is recent)", async (_name, fetchedAt) => {
+    const w = world({ ...server(fetchedAt), now: NOW });
+    expect((await w.run(update)).exitCode).toBe(1);
+  });
+
+  it("respects the configured limit", async () => {
+    const w = world({ ...server("2026-06-01T11:30:00.000Z"), now: NOW, deps: { maxStaleMinutes: 10 } });
+    expect((await w.run(update)).exitCode).toBe(1);
+  });
+
+  it("a stricter project still blocks when another matched project is fresh (any one may block)", async () => {
+    const w = world({ ...server("2026-06-01T10:00:00.000Z"), now: NOW });
+    expect((await w.run(update)).exitCode).toBe(1);
+  });
+});
+
+describe("refresh and learn (best effort)", () => {
+  /** A store whose cached policy appears only after `refresh` runs, like a first sync after assignment. */
+  function lateAssignment(refresh: () => Promise<void>) {
+    let cached: CachedPolicy | undefined;
+    const base = fakeStore({}, {});
+    const store = {
+      ...base,
+      listPolicyIds: async () => ok(cached === undefined ? [] : ["proj-1"]),
+      readPolicy: async () => ok(cached),
+    };
+    const events = memoryEvents();
+    const git = fakeGit({ knownObjects: [B], ancestors: [`${B}>${A}`], commits: { [A]: [C1] }, remotes: [OK_URL] });
+    const deps: PrePushDeps = {
+      store,
+      git,
+      events,
+      clock: fixedClock(),
+      newId: sequentialIds("id"),
+      agentVersion: "9.9.9",
+      maxStaleMinutes: 60,
+      refresh: async () => {
+        await refresh();
+        const policy = cachedPolicy("proj-1");
+        policy.source = "server";
+        cached = policy;
+      },
+    };
+    return { run: (url: string) => runPrePush({ remoteName: "origin", remoteUrl: url, stdin: update, cwd: "/repo" }, deps), events };
+  }
+
+  it("syncs before deciding, so a project assigned since the last push is enforced on this one", async () => {
+    const w = lateAssignment(async () => undefined);
+    const out = await w.run(OTHER_URL);
+    expect(out.exitCode).toBe(1);
+    expect(w.events.events[0]).toMatchObject({ projectId: "proj-1", outcome: "blocked" });
+  });
+
+  it("a failing refresh changes nothing: the cache decides", async () => {
+    const w = world({ deps: { refresh: async () => Promise.reject(new Error("offline")) } });
+    expect((await w.run(update)).exitCode).toBe(0);
+    expect((await w.run(update, OTHER_URL)).exitCode).toBe(1);
+  });
+
+  it("offers the matches to learn() and survives it failing", async () => {
+    const seen: string[] = [];
+    const w = world({ deps: { learn: async (m, url) => void seen.push(`${m.length}:${url}`) } });
+    await w.run(update);
+    expect(seen).toEqual([`1:${OK_URL}`]);
+    const failing = world({ deps: { learn: async () => Promise.reject(new Error("boom")) } });
+    expect((await failing.run(update)).exitCode).toBe(0);
+  });
+
+  it("does not call learn() for a repo that matches no project", async () => {
+    let called = false;
+    const w = world({ registered: false, deps: { learn: async () => void (called = true) } });
+    await w.run(update, "garbage");
+    expect(called).toBe(false);
+  });
+});
+
+describe("approved exceptions (ADR-007)", () => {
+  const exception = (over: Partial<ValidException> = {}): ValidException => ({
+    id: "exc-1",
+    projectId: "proj-1",
+    destination: { host: "github.com", repoPath: "personal/fork" },
+    status: "approved",
+    expiresAt: "2026-06-02T12:00:00.000Z",
+    approverId: "admin-1",
+    requesterId: "user-1",
+    waivedRuleIds: [],
+    ...over,
+  });
+  const grant = (e: ValidException = exception()) => ({ checkException: async () => ({ state: "valid" as const, exception: e }) });
+
+  it("an approved exception lets the push to the unapproved destination through, recorded as outcome exception with its id", async () => {
+    const w = world({ deps: grant() });
+    const out = await w.run(update, OTHER_URL);
+    expect(out.exitCode).toBe(0);
+    expect(out.lines.join("\n")).toContain("allowed by approved exception exc-1");
+    expect(w.events.events[0]).toMatchObject({ outcome: "exception", exceptionId: "exc-1", projectId: "proj-1", destination: { host: "github.com", repoPath: "personal/fork" } });
+  });
+
+  it("asks the server only when the destination is what blocks, with the project and the raw URL for the server to normalise", async () => {
+    const asked: string[][] = [];
+    const w = world({ deps: { checkException: async (p, d) => (asked.push([p, d]), { state: "none" as const }) } });
+    await w.run(update, OTHER_URL);
+    expect(asked).toEqual([["proj-1", OTHER_URL]]);
+    await w.run(update); // approved destination: nothing to ask
+    expect(asked).toHaveLength(1);
+  });
+
+  it("an exception does not waive content findings: a secret still blocks", async () => {
+    const w = world({ deps: grant(), git: { lines: { [C1]: [{ path: "a.ts", line: 1, text: secret() }] } } });
+    const out = await w.run(update, OTHER_URL);
+    expect(out.exitCode).toBe(1);
+    expect(w.events.events[0]).toMatchObject({ outcome: "blocked" });
+    expect(w.events.events[0]?.ruleIds).toContain("secret_detected");
+  });
+
+  it.each([
+    ["no exception", { state: "none" as const }],
+    ["the server unreachable", { state: "unavailable" as const }],
+  ])("blocks as before with %s", async (_name, check) => {
+    const w = world({ deps: { checkException: async () => check } });
+    expect((await w.run(update, OTHER_URL)).exitCode).toBe(1);
+    expect(w.events.events[0]).toMatchObject({ outcome: "blocked", ruleIds: ["destination_not_approved"] });
+  });
+
+  it("says plainly that exceptions need the server when it could not be asked", async () => {
+    const w = world({ deps: { checkException: async () => ({ state: "unavailable" as const }) } });
+    const text = (await w.run(update, OTHER_URL)).lines.join("\n");
+    expect(text).toContain("could not be checked because the DevGuard server is unreachable");
+  });
+
+  it("a checkException that throws blocks like an unreachable server", async () => {
+    const w = world({ deps: { checkException: async () => Promise.reject(new Error("boom")) } });
+    const out = await w.run(update, OTHER_URL);
+    expect(out.exitCode).toBe(1);
+    expect(out.lines.join("\n")).toContain("could not be checked");
+  });
+
+  it.each([
+    ["an exception for another destination", exception({ destination: { host: "github.com", repoPath: "someone/else" } })],
+    ["an exception for another project", exception({ projectId: "proj-other" })],
+    ["an expired exception", exception({ expiresAt: "2026-05-01T00:00:00.000Z" })],
+    ["a self-approved exception", exception({ approverId: "user-1" })],
+    ["an exception that is not approved", exception({ status: "revoked" })],
+  ])("the engine still refuses %s even if the server's answer were wrong", async (_name, bad) => {
+    const w = world({ deps: grant(bad) });
+    expect((await w.run(update, OTHER_URL)).exitCode).toBe(1);
+  });
+
+  it("the block message carries a ready command to request an exception", async () => {
+    const w = world();
+    const text = (await w.run(update, OTHER_URL)).lines.join("\n");
+    expect(text).toContain("devguard request-exception --project proj-1 --destination https://github.com/personal/fork --reason");
+  });
+
+  it("does not offer the command when the destination is not the problem", async () => {
+    const w = world({ git: { lines: { [C1]: [{ path: "a.ts", line: 1, text: secret() }] } } });
+    const text = (await w.run(update)).lines.join("\n");
+    expect(text).not.toContain("request-exception");
+  });
+});

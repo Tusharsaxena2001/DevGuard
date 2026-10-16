@@ -65,6 +65,26 @@ describe("round trips", () => {
     expect(await store.readPolicy("proj-a")).toEqual({ ok: true, value: cachedPolicy("proj-a") });
   });
 
+  it("deletes a cached policy, and deleting a missing one is fine", async () => {
+    await store.writePolicy(cachedPolicy("proj-a"));
+    await store.writePolicy(cachedPolicy("proj-b"));
+    await store.deletePolicy("proj-a");
+    await store.deletePolicy("proj-a");
+    await store.deletePolicy("never-existed");
+    expect(await store.listPolicyIds()).toEqual({ ok: true, value: ["proj-b"] });
+  });
+
+  it.each([["../escape"], ["a/b"], [""], [".hidden"]])("refuses to delete a policy with the unsafe id %j", async (id) => {
+    await expect(store.deletePolicy(id)).rejects.toMatchObject({ code: "store_write_failed" });
+  });
+
+  it("keeps the policy source and the sync ETag through a round trip", async () => {
+    await store.writePolicy({ ...cachedPolicy("proj-a"), source: "server" });
+    expect(await store.readPolicy("proj-a")).toEqual({ ok: true, value: { ...cachedPolicy("proj-a"), source: "server" } });
+    await store.writeConfig({ ...config, projectsEtag: '"abc"', lastContactAt: "2026-06-01T12:00:00.000Z" });
+    expect(await store.readConfig()).toEqual({ ok: true, value: { ...config, projectsEtag: '"abc"', lastContactAt: "2026-06-01T12:00:00.000Z" } });
+  });
+
   it("overwrites an existing file and leaves no temp files behind", async () => {
     await store.writeConfig(config);
     await store.writeConfig({ ...config, deviceId: "dev-2" });

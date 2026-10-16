@@ -29,4 +29,6 @@ export interface ConfigStore {
   listPolicyIds(): Promise<StoreList>;
   readPolicy(projectId: string): Promise<StoreRead<CachedPolicy>>;
   writePolicy(policy: CachedPolicy): Promise<void>;
+  /** Removes a cached policy. Missing is fine. Throws `AgentError("store_write_failed")` if it cannot be removed. */
+  deletePolicy(projectId: string): Promise<void>;
 }

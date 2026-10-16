@@ -93,7 +93,7 @@ export async function registerRepo(deps: RegisterDeps, request: RegisterRequest)
 
   if (toCache !== undefined) {
     policyCached = true;
-    await deps.store.writePolicy({ fetchedAt: now, project: toCache });
+    await deps.store.writePolicy({ fetchedAt: now, project: toCache, source: "local" });
   }
   const alreadyRegistered = existing.some((r) => r.repoPath === repoPath && r.projectId === projectId);
   if (!alreadyRegistered) {

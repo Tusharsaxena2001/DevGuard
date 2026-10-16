@@ -27,7 +27,7 @@ describe("formatStatusText", () => {
       "Credentials: ok",
       "Registered repos: 2",
       "Cached policies:",
-      "  proj-a: fetched 2026-06-01T12:00:00.000Z",
+      "  proj-a: supplied locally, fetched 2026-06-01T12:00:00.000Z",
     ]);
   });
 

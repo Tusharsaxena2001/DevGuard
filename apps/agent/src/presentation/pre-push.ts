@@ -25,6 +25,10 @@ export interface DecisionView {
   readonly destination: { readonly host: string; readonly repoPath: string } | null;
   readonly forcePushRefs: readonly string[];
   readonly correlationId: string;
+  /** For the ready-made `request-exception` command. */
+  readonly projectId?: string;
+  /** An exception may exist but the server could not be asked (offline): say so (ADR-004). */
+  readonly exceptionUnavailable?: boolean;
 }
 
 /** Human explanation of a decision. Silent (no lines) for a clean allow. Never includes the raw remote URL or any matched text. */
@@ -54,8 +58,14 @@ export function formatDecision(view: DecisionView): string[] {
   }
   if (blocked) {
     lines.push(
-      "  Next: push to an approved destination, or remove the flagged content from the commits you are pushing (it stays in history until the commits are rewritten), or ask the project owner for an exception.",
+      "  Next: push to an approved destination, or remove the flagged content from the commits you are pushing (it stays in history until the commits are rewritten), or ask for an exception.",
     );
+    if (view.exceptionUnavailable === true) {
+      lines.push("  Note: an approved exception could not be checked because the DevGuard server is unreachable; exceptions only work while it is.");
+    }
+    if (view.destination !== null && view.projectId !== undefined && decision.violatedRuleIds.includes("destination_not_approved")) {
+      lines.push(`  To ask for an exception to this destination:`, `    devguard request-exception --project ${safeText(view.projectId)} --destination ${safeText(`https://${view.destination.host}/${view.destination.repoPath}`)} --reason "why you need it"`);
+    }
   }
   lines.push(`  Reference: ${view.correlationId}`);
   return lines;
@@ -68,5 +78,26 @@ export function formatCannotCheck(reason: string, result: "blocked" | "allowed",
     `  Reason: ${reason}`,
     "  Run 'devguard status' to see what is wrong.",
     `  Reference: ${correlationId}`,
+  ];
+}
+
+export interface PolicyExpiredView {
+  readonly projectName: string;
+  readonly mode: EnforcementMode;
+  readonly maxStaleMinutes: number;
+  readonly blocked: boolean;
+  readonly correlationId: string;
+}
+
+/** The saved policy is too old to trust and the server could not refresh it (ADR-004). */
+export function formatPolicyExpired(view: PolicyExpiredView): string[] {
+  return [
+    view.blocked
+      ? "DevGuard blocked this push: its saved policy for this project is out of date and the server could not be reached."
+      : "DevGuard (audit-only): the saved policy for this project is out of date and the server could not be reached. The push was allowed and recorded.",
+    `  Project: ${safeText(view.projectName)} (${view.mode})`,
+    `  Why: policies are only trusted for ${view.maxStaleMinutes} minutes without contact with the DevGuard server.`,
+    view.blocked ? "  Next: reconnect (VPN or network) and run 'devguard sync', then push again." : "  Next: run 'devguard sync' when you are back online.",
+    `  Reference: ${view.correlationId}`,
   ];
 }

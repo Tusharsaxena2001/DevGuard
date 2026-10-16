@@ -65,7 +65,7 @@ describe("getStatus", () => {
       fakeStore({}, { "proj-a": ok(cachedPolicy("proj-a", "2026-06-02T00:00:00.000Z")), "proj-b": fail("invalid") }),
     );
     expect(report.policies).toEqual([
-      { projectId: "proj-a", state: "ok", fetchedAt: "2026-06-02T00:00:00.000Z" },
+      { projectId: "proj-a", state: "ok", fetchedAt: "2026-06-02T00:00:00.000Z", source: "local" },
       { projectId: "proj-b", state: "invalid" },
     ]);
     expect(report.healthy).toBe(false);
@@ -74,5 +74,28 @@ describe("getStatus", () => {
   it("never carries the device secret", async () => {
     const report = await getStatus(fakeStore({ config, credentials }));
     expect(JSON.stringify(report)).not.toContain(syntheticSecret());
+  });
+});
+
+describe("getStatus policy freshness (ADR-004)", () => {
+  const now = new Date("2026-06-01T12:00:00.000Z");
+  const policies = {
+    "srv-fresh": ok({ ...cachedPolicy("srv-fresh", "2026-06-01T11:58:00.000Z"), source: "server" as const }),
+    "srv-old": ok({ ...cachedPolicy("srv-old", "2026-06-01T10:00:00.000Z"), source: "server" as const }),
+    "local-old": ok({ ...cachedPolicy("local-old", "2016-01-01T00:00:00.000Z"), source: "local" as const }),
+  };
+
+  it("classifies server policies by age and never ages local ones", async () => {
+    const report = await getStatus(fakeStore({}, policies), { now, maxStaleMinutes: 60 });
+    const byId = Object.fromEntries(report.policies.map((p) => [p.projectId, p]));
+    expect(byId["srv-fresh"]).toMatchObject({ source: "server", freshness: "fresh" });
+    expect(byId["srv-old"]).toMatchObject({ source: "server", freshness: "expired" });
+    expect(byId["local-old"]).toMatchObject({ source: "local" });
+    expect(byId["local-old"]?.freshness).toBeUndefined();
+  });
+
+  it("omits freshness when the caller gives no clock", async () => {
+    const report = await getStatus(fakeStore({}, policies));
+    expect(report.policies.every((p) => p.freshness === undefined)).toBe(true);
   });
 });

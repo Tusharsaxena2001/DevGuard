@@ -1,4 +1,5 @@
 import { safeText } from "../safe-text.js";
+import type { ServerCheck } from "../use-cases/check-server.js";
 import type { RepoProtection } from "../use-cases/get-repo-protection.js";
 import type { FileState, StatusReport } from "../use-cases/get-status.js";
 
@@ -10,21 +11,29 @@ const STATE_TEXT: Record<FileState, string> = {
   unreadable: "UNREADABLE",
 };
 
+const FRESHNESS_NOTE: Record<string, string> = {
+  stale_ok: " (not refreshed recently; still trusted until the limit)",
+  expired: " (EXPIRED: pushes to enforced projects are blocked until 'devguard sync' succeeds)",
+};
+const freshnessNote = (freshness: string | undefined): string => (freshness === undefined ? "" : (FRESHNESS_NOTE[freshness] ?? ""));
+
 export function formatStatusText(report: StatusReport): string[] {
   const lines = [
     `DevGuard state: ${report.location}`,
     report.enrolled ? "Device: enrolled" : "Device: not enrolled",
     ...(report.serverUrl ? [`Server: ${safeText(report.serverUrl)}`] : []),
     ...(report.deviceId ? [`Device id: ${safeText(report.deviceId)}`] : []),
+    ...(report.lastContactAt ? [`Last server contact: ${safeText(report.lastContactAt)}`] : []),
     `Config: ${STATE_TEXT[report.config]}`,
     `Credentials: ${STATE_TEXT[report.credentials]}`,
+    ...(report.events === undefined ? [] : [`Pending events: ${report.events.pending}${report.events.dropped > 0 ? ` (${report.events.dropped} lost because the queue was full or damaged)` : ""}`]),
     `Registered repos: ${report.repos === "ok" ? report.registeredRepoCount : STATE_TEXT[report.repos]}`,
     report.policyCache !== "ok"
       ? `Cached policies: ${STATE_TEXT[report.policyCache]}`
       : report.policies.length === 0
         ? "Cached policies: none"
         : "Cached policies:",
-    ...report.policies.map((p) => `  ${safeText(p.projectId)}: ${p.state === "ok" ? `fetched ${p.fetchedAt ?? "unknown"}` : STATE_TEXT[p.state]}`),
+    ...report.policies.map((p) => `  ${safeText(p.projectId)}: ${p.state === "ok" ? `${p.source === "server" ? "from the server" : "supplied locally"}, fetched ${safeText(p.fetchedAt ?? "unknown")}${freshnessNote(p.freshness)}` : STATE_TEXT[p.state]}`),
   ];
   return report.healthy ? lines : [...lines, "Problem found: see the entries marked above."];
 }
@@ -49,6 +58,6 @@ export function formatRepoProtection(repo: RepoProtection): string[] {
   }
 }
 
-export function formatStatusJson(report: StatusReport): string {
-  return JSON.stringify(report, null, 2);
+export function formatStatusJson(report: StatusReport, serverCheck?: ServerCheck): string {
+  return JSON.stringify(serverCheck ? { ...report, serverCheck } : report, null, 2);
 }

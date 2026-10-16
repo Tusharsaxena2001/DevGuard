@@ -15,7 +15,8 @@ export function isAcceptableServerUrl(raw: string): boolean {
     return false;
   }
   const schemeOk = url.protocol === "https:" || (url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname));
-  return schemeOk && url.username === "" && url.password === "" && url.search === "" && url.hash === "";
+  // `new URL` normalises an empty "?" or "#" away, so check the raw text too.
+  return schemeOk && url.username === "" && url.password === "" && url.search === "" && url.hash === "" && !/[?#]/.test(raw);
 }
 
 /** `config.json`: where the server is and which device this is. Not secret. */
@@ -23,6 +24,12 @@ export const AgentConfigSchema = z
   .object({
     serverUrl: z.string().max(2048).refine(isAcceptableServerUrl, "must be https (http only for localhost) with no credentials, query or fragment"),
     deviceId: IdSchema,
+    /** Last time the server answered this device successfully. Informational only; never used for decisions. */
+    lastContactAt: IsoDateTimeSchema.optional(),
+    /** ETag of the last project sync that was fully cached; lets the next sync ask "anything new?" (AG-6). */
+    projectsEtag: z.string().min(1).max(128).optional(),
+    /** The project ids that sync cached. The ETag is only sent while the cache still holds exactly these. */
+    syncedProjectIds: z.array(z.string().min(1).max(128)).max(1000).optional(),
   })
   .strict();
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
@@ -59,6 +66,11 @@ export const CachedPolicySchema = z
   .object({
     fetchedAt: IsoDateTimeSchema,
     project: AgentProjectSchema,
+    /**
+     * `server`: synced from the API (authoritative, ages out per ADR-004, replaced and removed by sync).
+     * `local` or absent: supplied by hand with `register --policy-file` (never removed or aged by sync).
+     */
+    source: z.enum(["server", "local"]).optional(),
   })
   .strict();
 export type CachedPolicy = z.infer<typeof CachedPolicySchema>;

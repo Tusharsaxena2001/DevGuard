@@ -67,7 +67,7 @@ describe("registerRepo", () => {
     const h = harness({ file: project("proj-9") });
     const r = await registerRepo(h.deps, { path: "/repo", projectId: "proj-9", policyFile: "p.json" });
     expect(r).toMatchObject({ projectId: "proj-9", policyCached: true });
-    expect(h.writes.policies).toEqual([{ fetchedAt: "2026-06-01T12:00:00.000Z", project: project("proj-9") }]);
+    expect(h.writes.policies).toEqual([{ fetchedAt: "2026-06-01T12:00:00.000Z", project: project("proj-9"), source: "local" }]);
   });
 
   it.each([

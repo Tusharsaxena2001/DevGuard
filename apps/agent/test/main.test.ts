@@ -97,10 +97,16 @@ describe("main.ts (real composition root)", () => {
     expect(out + err).not.toContain(syntheticSecret());
   });
 
-  it("a stub command exits 2 through the real entry point", async () => {
-    const { code, err } = await runMain(["enroll"], { HOME: fakeHome, DEVGUARD_HOME: stateDir });
+  it("a usage error exits 2 through the real entry point", async () => {
+    const { code, err } = await runMain(["request-exception"], { HOME: fakeHome, DEVGUARD_HOME: stateDir });
     expect(code).toBe(2);
-    expect(err).toContain("not available in this build yet");
+    expect(err).toContain("required option");
+  });
+
+  it("a command that needs enrollment says so on an unenrolled device (exit 2, no network)", async () => {
+    const { code, err } = await runMain(["request-exception", "--destination", "https://github.com/a/b", "--reason", "need it for the handover"], { HOME: fakeHome, DEVGUARD_HOME: stateDir });
+    expect(code).toBe(2);
+    expect(err).toContain("not enrolled");
   });
 });
 

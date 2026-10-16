@@ -14,6 +14,8 @@ export interface RepoMatch {
   readonly project: AgentProject;
   readonly fetchedAt: string;
   readonly via: MatchVia;
+  /** Where the cached policy came from: the server (ages per ADR-004) or a local file (never ages). */
+  readonly source: "server" | "local";
 }
 
 export type RepoResolution =
@@ -77,13 +79,13 @@ export async function resolveRepo(deps: { store: ConfigStore; git: GitPort }, fa
   const ids = await deps.store.listPolicyIds();
   if (!repos.ok || !ids.ok) return fail("state_unusable");
 
-  const cached = new Map<string, { project: AgentProject; fetchedAt: string }>();
+  const cached = new Map<string, { project: AgentProject; fetchedAt: string; source: "server" | "local" }>();
   for (const id of ids.value) {
     const policy = await deps.store.readPolicy(id);
     if (!policy.ok || policy.value === undefined) return fail("policy_unusable");
     // Two files claiming one project id: which is authoritative is unknowable, so do not guess.
     if (cached.has(policy.value.project.projectId)) return fail("policy_unusable");
-    cached.set(policy.value.project.projectId, { project: policy.value.project, fetchedAt: policy.value.fetchedAt });
+    cached.set(policy.value.project.projectId, { project: policy.value.project, fetchedAt: policy.value.fetchedAt, source: policy.value.source === "server" ? "server" : "local" });
   }
 
   const manualIds = new Set((repos.value?.repos ?? []).filter((r) => facts.repoRoots.includes(r.repoPath)).map((r) => r.projectId));
@@ -94,7 +96,7 @@ export async function resolveRepo(deps: { store: ConfigStore; git: GitPort }, fa
   const remotes = remoteKeys(facts.pushUrl === undefined ? urls : [...urls, facts.pushUrl]);
 
   const matches: RepoMatch[] = [];
-  for (const { project, fetchedAt } of cached.values()) {
+  for (const { project, fetchedAt, source } of cached.values()) {
     const via = new Set<MatchVia>();
     if (project.fingerprints.some((f) => fingerprints.has(f))) via.add("fingerprint");
     const identities = [
@@ -104,7 +106,7 @@ export async function resolveRepo(deps: { store: ConfigStore; git: GitPort }, fa
     if (identities.some((d) => remotes.has(key(d.host, d.repoPath)))) via.add("remote");
     if (manualIds.has(project.projectId)) via.add("manual");
     const first = VIA_ORDER.find((v) => via.has(v));
-    if (first !== undefined) matches.push({ project, fetchedAt, via: first });
+    if (first !== undefined) matches.push({ project, fetchedAt, via: first, source });
   }
 
   matches.sort(compareRestrictive);
