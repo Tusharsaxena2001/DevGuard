@@ -50,7 +50,7 @@ Status: `todo` | `in-progress` | `done`. Update via `/implement-module`. Specs: 
 | ID | Module | Status |
 |----|--------|--------|
 | X-1 | Docker Compose + dev setup | in-progress (Postgres, Mailpit and api compose services done; dashboard service pending) |
-| X-2 | E2E, hardening, demo, limitations | in-progress (how-to-test guide, sandbox script and automated `scripts/e2e-demo.sh` (62 checks) done: `docs/testing/how-to-test.md`; clean-clone check pending) |
+| X-2 | E2E, hardening, demo, limitations | in-progress (how-to-test guide, sandbox script and automated `scripts/e2e-demo.sh` (62 checks) done: `docs/testing/how-to-test.md`; clean-clone run done: setup, 62 e2e checks and all suites pass from a fresh clone) |
 
 ## Build order
 SH-1 -> SH-2/3/4 -> AG-1 -> AG-2 -> AG-3 -> AG-4 (**Gate 1**) -> API-1..3 -> AG-5 -> API-4 -> AG-6 -> API-5 -> AG-7 (**Gate 2**) -> API-6 -> AG-8 -> API-7 -> API-8 -> UI-1..8 (UI-1 may start after API-2) (**Gate 3**) -> X-2 (**Gate 4**).
