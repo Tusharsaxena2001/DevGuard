@@ -11,6 +11,7 @@
     "test": "vitest run",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
+    "preseed": "prisma generate",
     "seed": "tsx prisma/seed.ts",
     "start": "node dist/main.js",
     "start:dev": "tsx watch src/main.ts",
