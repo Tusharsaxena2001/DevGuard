@@ -15,6 +15,8 @@ export const EnvSchema = z.object({
   EXCEPTION_MAX_TTL_HOURS: positiveInt(72),
   THROTTLE_TTL_SECONDS: positiveInt(60),
   THROTTLE_LIMIT: positiveInt(120),
+  /** Requests per window for login and enrollment (brute-force protection). */
+  AUTH_THROTTLE_LIMIT: positiveInt(10),
 });
 export type Env = z.infer<typeof EnvSchema>;
 

@@ -10,6 +10,9 @@ import type { Env } from "./config/env.js";
 export async function createApp(env: Env): Promise<NestExpressApplication> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule.register(env), { bufferLogs: true });
   app.useLogger(app.get(Logger));
+  // Event batches carry findings and outgrow Express's 100 kB default; the agent keeps its batches under 1 MB, so 2 MB is
+  // headroom, not an invitation. Everything else is far smaller.
+  app.useBodyParser("json", { limit: "2mb" });
   app.use(helmet());
   // Only the dashboard origin may call the API from a browser.
   // A static `origin` string would be sent to every caller; this answers with it only when the request matches.

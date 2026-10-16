@@ -11,6 +11,7 @@ describe("error mapping", () => {
 
   it.each([
     [ErrorCode.Unauthenticated, 401],
+    [ErrorCode.DeviceRevoked, 401],
     [ErrorCode.Forbidden, 403],
     [ErrorCode.SelfApprovalForbidden, 403],
     [ErrorCode.NotFound, 404],

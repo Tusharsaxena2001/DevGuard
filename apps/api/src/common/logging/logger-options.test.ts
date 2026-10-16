@@ -28,6 +28,8 @@ describe("logger redaction", () => {
     ["nested secret", { device: { secret: sensitive } }],
     ["hash fields", { user: { passwordHash: sensitive }, device: { secretHash: sensitive }, enrollment: { tokenHash: sensitive } }],
     ["top-level password", { password: sensitive }],
+    ["device secret (enroll response)", { res: { deviceSecret: sensitive } }],
+    ["top-level device secret", { deviceSecret: sensitive }],
   ])("redacts %s", (_name, payload) => {
     const line = logOnce(payload);
     expect(line).not.toContain(sensitive);

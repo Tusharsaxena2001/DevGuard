@@ -13,6 +13,7 @@ export const REDACT_PATHS: readonly string[] = [
   "*.password",
   "*.passwordHash",
   "*.secret",
+  "*.deviceSecret",
   "*.secretHash",
   "*.tokenHash",
   "authorization",
@@ -20,6 +21,7 @@ export const REDACT_PATHS: readonly string[] = [
   "token",
   "password",
   "secret",
+  "deviceSecret",
 ];
 
 export interface LoggerOptions {

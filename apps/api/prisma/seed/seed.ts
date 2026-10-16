@@ -1,8 +1,8 @@
 import type { PrismaClient } from "../../src/prisma/generated/client.js";
 
 /**
- * Non-loginable placeholders. API-1 has no password hashing yet (argon2id arrives with API-2), and seed data must
- * never carry a usable credential. API-2's seed step sets real hashes from env.
+ * Non-loginable placeholders. Without a `passwordHash` argument the seed ships no usable credential at all.
+ * With one, only users still holding the placeholder get it (an existing real password is never overwritten).
  */
 export const SEED_PASSWORD_PLACEHOLDER = "!seed-no-login";
 export const SEED_DEVICE_SECRET_PLACEHOLDER = "!seed-no-device-secret";
@@ -21,16 +21,23 @@ export interface SeedSummary {
 }
 
 /** Idempotent: every row is keyed by a natural key or fixed id, so running it twice changes nothing. */
-export async function seedDatabase(prisma: PrismaClient, now: Date): Promise<SeedSummary> {
-  const user = async (email: string, name: string): Promise<{ id: string }> =>
-    prisma.user.upsert({
+export async function seedDatabase(prisma: PrismaClient, now: Date, passwordHash?: string): Promise<SeedSummary> {
+  const user = async (email: string, name: string): Promise<{ id: string }> => {
+    const row = await prisma.user.upsert({
       where: { email },
-      create: { email, name, passwordHash: SEED_PASSWORD_PLACEHOLDER },
+      create: { email, name, passwordHash: passwordHash ?? SEED_PASSWORD_PLACEHOLDER },
       update: {},
       select: { id: true },
     });
+    if (passwordHash !== undefined) {
+      await prisma.user.updateMany({ where: { email, passwordHash: SEED_PASSWORD_PLACEHOLDER }, data: { passwordHash } });
+    }
+    return row;
+  };
 
   const admin = await user("admin@example.test", "Seed Security Admin");
+  // A second admin so a request approved by one admin can be tested against a different requester.
+  const admin2 = await user("admin2@example.test", "Seed Security Admin Two");
   const lead = await user("lead@example.test", "Seed Team Lead");
   const alice = await user("alice@example.test", "Seed Employee Alice");
   const bob = await user("bob@example.test", "Seed Employee Bob");
@@ -52,6 +59,7 @@ export async function seedDatabase(prisma: PrismaClient, now: Date): Promise<See
   const website = await project("marketing-website", "internal");
 
   await membership(admin.id, "security_admin", null);
+  await membership(admin2.id, "security_admin", null);
   await membership(lead.id, "team_lead", payments.id);
   await membership(lead.id, "team_lead", website.id);
   await membership(alice.id, "employee", payments.id);
@@ -66,6 +74,17 @@ export async function seedDatabase(prisma: PrismaClient, now: Date): Promise<See
   };
   await destination(payments.id, "git.example.test", "acme/payments-service");
   await destination(website.id, "git.example.test", "acme/marketing-website");
+
+  // Canonical repos let agents recognise the project by remote (ADR-008).
+  const canonical = async (projectId: string, host: string, repoPath: string): Promise<void> => {
+    await prisma.canonicalRepo.upsert({
+      where: { projectId_host_repoPath: { projectId, host, repoPath } },
+      create: { projectId, host, repoPath, createdBy: admin.id },
+      update: {},
+    });
+  };
+  await canonical(payments.id, "git.example.test", "acme/payments-service");
+  await canonical(website.id, "git.example.test", "acme/marketing-website");
 
   const policy = async (projectId: string, mode: "enforce" | "audit_only"): Promise<void> => {
     const { id: policyId } = await prisma.policy.upsert({ where: { projectId }, create: { projectId }, update: {}, select: { id: true } });

@@ -21,9 +21,9 @@ export class ApiError extends Error {
 export function httpStatusFor(code: ErrorCode): number {
   switch (code) {
     case ErrorCode.Unauthenticated:
+    case ErrorCode.DeviceRevoked: // a revoked device is unauthenticated; the code lets the agent tell the cases apart
       return 401;
     case ErrorCode.Forbidden:
-    case ErrorCode.DeviceRevoked:
     case ErrorCode.SelfApprovalForbidden:
       return 403;
     case ErrorCode.NotFound:

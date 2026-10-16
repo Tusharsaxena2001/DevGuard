@@ -35,7 +35,7 @@ export async function resetData(prisma: PrismaClient): Promise<void> {
   await prisma.$transaction([
     ...toggle("DISABLE").map((sql) => prisma.$executeRawUnsafe(sql)),
     prisma.$executeRawUnsafe(`
-      TRUNCATE "SecurityEvent", "ExceptionDecision", "ExceptionRequest", "RepoRegistration", "ApprovedDestination",
+      TRUNCATE "SecurityEvent", "ExceptionDecision", "ExceptionRequest", "RepoRegistration", "ApprovedDestination", "CanonicalRepo", "ProjectFingerprint",
                "EnrollmentToken", "Device", "Membership", "Project", "Policy", "User", "PolicyVersion", "AdminAuditEvent"
       RESTART IDENTITY CASCADE`),
     ...toggle("ENABLE").map((sql) => prisma.$executeRawUnsafe(sql)),

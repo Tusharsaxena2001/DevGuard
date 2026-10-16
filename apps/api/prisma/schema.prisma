@@ -150,6 +150,8 @@ model Project {
   memberships          Membership[]
   repoRegistrations    RepoRegistration[]
   approvedDestinations ApprovedDestination[]
+  canonicalRepos       CanonicalRepo[]
+  fingerprints         ProjectFingerprint[]
   policy               Policy?
   securityEvents       SecurityEvent[]
   exceptionRequests    ExceptionRequest[]
@@ -168,6 +170,40 @@ model RepoRegistration {
 
   @@unique([deviceId, repoFingerprint])
   @@index([projectId])
+}
+
+enum FingerprintSource {
+  device
+  manual
+}
+
+/// A repo identity the project is known by on a laptop (ADR-008): used for remote-based matching by agents.
+model CanonicalRepo {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  host      String
+  repoPath  String
+  createdBy String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, host, repoPath])
+}
+
+/// Root-commit hashes that identify a project's repos regardless of remote URL (ADR-008, ADR-012).
+model ProjectFingerprint {
+  id                 String            @id @default(uuid()) @db.Uuid
+  projectId          String            @db.Uuid
+  fingerprint        String
+  source             FingerprintSource
+  reportedByDeviceId String?           @db.Uuid
+  createdBy          String?           @db.Uuid
+  createdAt          DateTime          @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, fingerprint])
 }
 
 model ApprovedDestination {
@@ -229,6 +265,7 @@ model ExceptionRequest {
   decisions ExceptionDecision[]
 
   @@index([projectId, status])
+  @@index([requesterId, projectId, destHost, destRepo])
 }
 
 /// Decisions are history rows (API-6 may extend). Expiry is checked at validation time against `expiresAt`.
@@ -253,23 +290,36 @@ model SecurityEvent {
   deviceId      String        @db.Uuid
   userId        String        @db.Uuid
   projectId     String?       @db.Uuid
-  destHost      String
-  destRepo      String
+  /// Null when the pushed-to URL could not be parsed (treated as unapproved).
+  destHost      String?
+  destRepo      String?
   operation     OperationType
+  /// Branch/tag names being pushed: metadata only.
+  refs          String[]      @default([])
   ruleIds       String[]
-  mode          EnforcementMode
+  /// Rule id, kind, file path, line and commit per finding. Never matched text or file contents (ADR-005).
+  findings      Json          @default("[]")
+  /// Null when no project governed the push.
+  mode          EnforcementMode?
+  wouldBlock    Boolean       @default(false)
   outcome       Outcome
   correlationId String
   policyVersion Int?
   exceptionId   String?       @db.Uuid
   approverId    String?       @db.Uuid
+  agentVersion  String        @default("")
+  /// Agent-generated; (deviceId, idempotencyKey) is unique so redelivery is a no-op. Null only for seed rows.
+  idempotencyKey String?
   receivedAt    DateTime      @default(now())
 
   device  Device   @relation(fields: [deviceId], references: [id], onDelete: Restrict)
   project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
+  @@unique([deviceId, idempotencyKey])
   @@index([projectId, occurredAt])
   @@index([deviceId, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([occurredAt])
   @@index([outcome])
   @@index([correlationId])
 }
