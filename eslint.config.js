@@ -42,6 +42,37 @@ const agentLayer = (folder, patterns) => ({
   },
 });
 
+const DASHBOARD_FEATURES = ["auth", "overview", "events", "projects", "devices", "approvals", "audit"];
+// The shared pattern above also matches "../api/..", which is the name of every dashboard feature's hooks folder.
+const noOtherAppsFromDashboard = {
+  group: ["**/apps/api/**", "**/apps/agent/**", "@devguard/api", "@devguard/agent", "**/../agent/**", "**/../api/src/**"],
+  message: "Apps never import other apps; share code through packages/.",
+};
+const noServerPackages = {
+  group: ["@devguard/policy-engine", "@devguard/api", "@devguard/agent"],
+  message: "The dashboard may use only @devguard/shared (types and schemas). Decisions and enforcement live in the API.",
+};
+/** Layer boundaries for apps/dashboard (docs/architecture/engineering-standards.md). */
+const dashboardFeature = (feature) => ({
+  files: [`apps/dashboard/src/features/${feature}/**/*.{ts,tsx}`],
+  rules: {
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          noOtherAppsFromDashboard,
+          noServerPackages,
+          ...DASHBOARD_FEATURES.filter((f) => f !== feature).map((f) => ({
+            // Relative imports between features look like "../../projects/api/projects.js" (no "features" in the path).
+            group: [`**/features/${f}`, `**/features/${f}/**`, `**/${f}/api/**`, `**/${f}/pages/**`, `**/${f}/components/**`],
+            message: "Features do not import each other: promote what is shared to src/shared/.",
+          })),
+        ],
+      },
+    ],
+  },
+});
+
 export default tseslint.config(
   { ignores: ["**/dist/**", "**/node_modules/**", "**/coverage/**", "**/prisma/generated/**"] },
   ...tseslint.configs.recommended,
@@ -56,6 +87,17 @@ export default tseslint.config(
   apiFiles(["apps/api/src/**/*.service.ts"], [noPrisma, noOtherModuleRepository]),
   // Repositories and the Prisma wiring are the only places allowed to touch the client.
   apiFiles(["apps/api/src/**/*.repository.ts", "apps/api/src/prisma/**/*.ts", "apps/api/src/**/*.test.ts"], []),
+  ...DASHBOARD_FEATURES.map(dashboardFeature),
+  {
+    files: ["apps/dashboard/src/shared/**/*.{ts,tsx}", "apps/dashboard/src/app/**/*.{ts,tsx}"],
+    rules: { "no-restricted-imports": ["error", { patterns: [noOtherAppsFromDashboard, noServerPackages] }] },
+  },
+  // `fetch` lives in exactly one place: the API client. Components and pages use query hooks.
+  {
+    files: ["apps/dashboard/src/**/*.{ts,tsx}"],
+    ignores: ["apps/dashboard/src/shared/lib/api-client.ts", "apps/dashboard/src/**/*.test.{ts,tsx}"],
+    rules: { "no-restricted-globals": ["error", { name: "fetch", message: "Call the API through the client in shared/lib/api-client.ts, via a query hook in features/*/api." }] },
+  },
   agentLayer("cli", [noAdapters, noIo]),
   agentLayer("use-cases", [noAdapters, noCli, noCommander, noIo]),
   agentLayer("ports", [noAdapters, noCli, noCommander, noIo]),

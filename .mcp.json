@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@0.0.83", "--executable-path", "/usr/bin/google-chrome", "--isolated", "--allowed-origins", "http://localhost:5173"]
+    }
+  }
+}

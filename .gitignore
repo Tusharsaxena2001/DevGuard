@@ -23,3 +23,6 @@ coverage/
 
 # Prisma generated client (apps/api, built by prisma generate)
 apps/api/src/prisma/generated/
+
+# Playwright MCP output
+.playwright-mcp/

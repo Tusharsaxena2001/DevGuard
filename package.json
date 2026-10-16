@@ -12,7 +12,8 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "e2e:demo": "bash scripts/e2e-demo.sh"
   },
   "devDependencies": {
     "@types/node": "^24.19.1",
