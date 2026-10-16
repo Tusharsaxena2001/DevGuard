@@ -9,7 +9,7 @@
 - Error codes: stable string enum.
 
 ## Implemented (packages/shared/src)
-`enums.ts` (roles, classification, mode, outcome, operation, device/exception status, `RuleId`), `common.ts` (`GitSha`, `NormalizedDestination`), `findings.ts` (`Finding`, `RefUpdate`, `ChangedFile`, `OutgoingChangeSummary`), `policy.ts` (`ProjectPolicy`, `ApprovedDestination`, `AgentProject`, `AgentProjectSync`), `decision.ts`, `events.ts` (`SecurityEventInput`, batch), `exceptions.ts` (request/decision inputs, `ValidException`, validation result), `errors.ts` (`ErrorCode`). Consumers import from `@devguard/shared` (built to `dist/`; run `pnpm --filter @devguard/shared build` after changes). Event bodies carry no identity fields: the server derives device/employee from the credential.
+`enums.ts` (roles, classification, mode, outcome, operation, device/exception status, `RuleId`), `common.ts` (`GitSha`, `NormalizedDestination`), `findings.ts` (`Finding`, `RefUpdate`, `ChangedFile`, `OutgoingChangeSummary`), `policy.ts` (`ProjectPolicy`, `ApprovedDestination`, `AgentProject`, `AgentProjectSync`), `decision.ts`, `events.ts` (`SecurityEventInput`, batch), `exceptions.ts` (request/decision inputs, `ValidException`, validation result), `errors.ts` (`ErrorCode`), `auth.ts` and `devices.ts` (API-2: login/session/user and enrollment/device/heartbeat DTOs plus `formatDeviceCredential`/`parseDeviceCredential`). Consumers import from `@devguard/shared` (built to `dist/`; run `pnpm --filter @devguard/shared build` after changes). Event bodies carry no identity fields: the server derives device/employee from the credential.
 
 ## Security invariants
 `Finding` and `SecurityEventInput` have no field capable of carrying file contents or secret values; schemas are `.strict()`.

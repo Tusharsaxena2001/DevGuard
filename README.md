@@ -2,14 +2,20 @@
 
 Developer security guardrail for company-managed laptops. A managed Git `pre-push` hook blocks pushes of protected repositories to unapproved destinations, scans outgoing commits for prohibited files and high-confidence secrets, and reports events to a central dashboard. Exceptions are scoped, expiring and approved server-side.
 
-> **Status:** documentation and AI-native scaffolding are complete; application modules are implemented one at a time. See [`docs/plans/module-roadmap.md`](docs/plans/module-roadmap.md) for what exists. Commands below marked *(planned)* work only after the listed module lands.
+> **Status:** hackathon build. The agent (AG-1..8), the API (API-1..7) and a minimal admin dashboard (UI-1..7) are implemented and tested end to end. Not built: alerts (API-8/UI-8) and team-lead scoping ([ADR-014](docs/decisions/ADR-014-mvp-authorization-scope.md)). Status per module: [`docs/plans/module-roadmap.md`](docs/plans/module-roadmap.md).
+>
+> **Running it for a team?** See [`docs/usage.md`](docs/usage.md): install, enroll a laptop to a project, and monitor pushes.
+>
+> **Automated check:** `pnpm e2e:demo -- --port 3931` runs the whole flow end to end and prints PASS/FAIL.
+>
+> **Want to try it?** Follow [`docs/testing/how-to-test.md`](docs/testing/how-to-test.md): setup, a throwaway sandbox "laptop", and a walkthrough of every flow (block, secret, exception, offline, audit).
 
 ## Monorepo layout (pnpm workspaces)
 ```
-apps/agent       endpoint CLI + Git hook (AG-*)         [AG-1..3: CLI, local store, hook installer, pre-push runner]
-apps/api         NestJS + Prisma + PostgreSQL (API-*)   [planned]
-apps/dashboard   React + Vite + Tailwind + shadcn (UI-*)[planned]
-packages/shared  policy-engine  config                  [planned]
+apps/agent       endpoint CLI + Git hook (AG-*)         enroll, sync, hook, events, exceptions
+apps/api         NestJS + Prisma + PostgreSQL (API-*)   auth, projects, policies, events, exceptions, audit, metrics
+apps/dashboard   React + Vite + Tailwind (UI-*)         admin dashboard (ADR-015)
+packages/shared  policy-engine  config                  contracts, pure policy logic, tooling
 docs/  .claude/  CLAUDE.md
 ```
 
@@ -26,10 +32,10 @@ docker compose ps                 # wait for "healthy"
 set -a; . ./.env; set +a          # the Prisma CLI and seed read DATABASE_URL from the environment
 pnpm --filter @devguard/shared build
 pnpm --filter @devguard/api prisma:deploy # apply migrations (API-1)
-pnpm --filter @devguard/api seed          # synthetic demo data, idempotent; no usable credentials
-pnpm --filter @devguard/api start:dev     # http://localhost:3000, /health, OpenAPI at /docs
+SEED_PASSWORD='a-12+-character-password' pnpm --filter @devguard/api seed   # synthetic demo users and data, idempotent (without SEED_PASSWORD a random one is printed once)
+pnpm --filter @devguard/api build && pnpm --filter @devguard/api start   # http://localhost:3000, /health, OpenAPI at /docs (or start:dev from source)
 # or run the API in a container: docker compose up -d api   (dev-only image; applies migrations at start)
-pnpm --filter dashboard dev               # (planned: UI-1) http://localhost:5173
+pnpm --filter @devguard/dashboard dev     # http://localhost:5173 (proxies /v1 to DEVGUARD_API_URL, default http://localhost:3000)
 ```
 Stop infra: `pnpm db:down` (add `-v` to `docker compose down` to wipe local data).
 Port note: Postgres is published on **5433** because 5432 is commonly in use; change `POSTGRES_PORT` and `DATABASE_URL` together if needed.
@@ -37,11 +43,14 @@ Port note: Postgres is published on **5433** because 5432 is commonly in use; ch
 ## How protection is configured
 Admins and team leads configure everything in the dashboard: projects, classification, enforcement mode, canonical repos, approved destinations, and which employees are assigned. Developers only install the agent and enroll once with a token issued from the dashboard; repos are then matched to projects automatically (by root-commit fingerprint, falling back to remote match). See [ADR-008](docs/decisions/ADR-008-dashboard-managed-protection.md).
 
-## Agent quick start *(local mode available: AG-1..AG-4; enrollment is AG-5)*
+## Agent quick start
 ```bash
-pnpm --filter agent build
-devguard enroll --server <url> --token <token>   # once per laptop (AG-5); installs the global hook
-devguard status                                  # hook state, matched repos, overrides detected
+pnpm --filter @devguard/agent build              # `devguard` = node apps/agent/dist/main.js
+echo '<token>' | devguard enroll --server <url> --token-stdin   # once per laptop; installs the global hook and syncs
+devguard status [--check-server]                 # enrollment, hook state, cached policies, pending events
+devguard sync                                    # refresh policies; also delivers queued events
+devguard request-exception --destination <url> --reason "why"   # after a blocked push
+devguard exception status                        # what became of your requests
 
 # Local/offline mode (Gate 1, no backend) and fallback:
 devguard install --repo ./my-repo                # per-repo hook
