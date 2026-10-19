@@ -41,6 +41,11 @@ export class UsersService {
     return new Map((await this.users.findManyByIds(ids)).map((u) => [u.id, u.name]));
   }
 
+  /** Where admin alerts go: active security admins only. */
+  public adminEmails(): Promise<string[]> {
+    return this.users.findActiveAdminEmails();
+  }
+
   public async list(): Promise<UserSummary[]> {
     return (await this.users.list()).map(toUserSummary);
   }

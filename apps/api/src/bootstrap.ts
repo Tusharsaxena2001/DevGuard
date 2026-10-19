@@ -19,6 +19,7 @@ export async function createApp(env: Env): Promise<NestExpressApplication> {
   const dashboardOrigin = new URL(env.DASHBOARD_BASE_URL).origin;
   app.enableCors({ origin: (origin, done) => done(null, origin === dashboardOrigin ? dashboardOrigin : false), credentials: true });
   app.disable("x-powered-by");
+  if (env.TRUST_PROXY_HOPS > 0) app.set("trust proxy", env.TRUST_PROXY_HOPS);
 
   if (env.NODE_ENV !== "production") {
     const config = new DocumentBuilder().setTitle("DevGuard API").setVersion("0.0.0").build();

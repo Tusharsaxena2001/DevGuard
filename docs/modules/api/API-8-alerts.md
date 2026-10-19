@@ -1,5 +1,7 @@
 # API-8 Alerts and notifications (apps/api)
 
+> **Status: minimal email slice delivered ([ADR-016](../../decisions/ADR-016-minimal-email-alerts.md)).** Built: `modules/alerts/` with `AlertsService.onEventsRecorded` (blocked enforce push, `secret_detected`/`scan_error`), a `MailSender` port with nodemailer and no-op adapters, `SMTP_*` env, email to active security admins, fire-and-forget. Everything below that is not in this note (inbox, preferences, Slack/Teams, outbox/retries, throttling, exception mails, new tables) is still deferred.
+
 **Responsibility:** notify the responsible people when something needs attention (ADR-009).
 **Depends on:** API-2 (memberships), API-5 (events), API-6 (exceptions).
 

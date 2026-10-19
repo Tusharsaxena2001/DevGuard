@@ -18,6 +18,25 @@ describe("parseEnv", () => {
     }
   });
 
+  it("leaves SMTP off when SMTP_HOST is unset or blank, and treats blank credentials as unset", () => {
+    for (const raw of [valid, { ...valid, SMTP_HOST: "", SMTP_USER: "", SMTP_PASSWORD: "" }, { ...valid, SMTP_HOST: "  " }]) {
+      const result = parseEnv(raw);
+      expect(result.ok && result.env.SMTP_HOST).toBeUndefined();
+      expect(result.ok && result.env.SMTP_USER).toBeUndefined();
+    }
+    const on = parseEnv({ ...valid, SMTP_HOST: "localhost", SMTP_PORT: "2525" });
+    expect(on.ok && on.env.SMTP_HOST).toBe("localhost");
+    expect(on.ok && on.env.SMTP_PORT).toBe(2525);
+    expect(on.ok && on.env.SMTP_FROM).toBe("devguard@localhost");
+  });
+
+  it("defaults TRUST_PROXY_HOPS to 0 and rejects negative or absurd values", () => {
+    const base = parseEnv(valid);
+    expect(base.ok && base.env.TRUST_PROXY_HOPS).toBe(0);
+    expect(parseEnv({ ...valid, TRUST_PROXY_HOPS: "1" }).ok).toBe(true);
+    for (const bad of ["-1", "6", "yes", "1.5"]) expect(parseEnv({ ...valid, TRUST_PROXY_HOPS: bad }).ok).toBe(false);
+  });
+
   it("coerces numeric strings", () => {
     const result = parseEnv({ ...valid, API_PORT: "4010", SESSION_TTL_MINUTES: "15" });
     expect(result.ok && result.env.API_PORT).toBe(4010);

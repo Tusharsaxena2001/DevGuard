@@ -3,6 +3,7 @@ import { ErrorCode, type EventBatchResult, type EventPage, type EventQuery, type
 import type { DevicePrincipal, UserPrincipal } from "../../common/auth/principals.js";
 import { CLOCK, type Clock } from "../../common/clock/clock.js";
 import { ApiError } from "../../errors.js";
+import { AlertsService } from "../alerts/alerts.service.js";
 import { ProjectsService } from "../projects/projects.service.js";
 import { UsersService } from "../users/users.service.js";
 import { toEventEntry } from "./events.mapper.js";
@@ -16,6 +17,7 @@ export class EventsService {
     @Inject(EventsRepository) private readonly repo: EventsRepository,
     @Inject(ProjectsService) private readonly projects: ProjectsService,
     @Inject(UsersService) private readonly users: UsersService,
+    @Inject(AlertsService) private readonly alerts: AlertsService,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -49,7 +51,11 @@ export class EventsService {
         results.push({ idempotencyKey: event.idempotencyKey, status: "accepted" });
       }
     }
-    if (toStore.length > 0) await this.repo.insert(device.deviceId, device.userId, toStore, this.clock.now());
+    if (toStore.length > 0) {
+      await this.repo.insert(device.deviceId, device.userId, toStore, this.clock.now());
+      // Only newly accepted events reach here, so a resubmitted batch is not mailed twice. Fire and forget: never fails ingestion.
+      this.alerts.onEventsRecorded(device, toStore);
+    }
     return { results };
   }
 

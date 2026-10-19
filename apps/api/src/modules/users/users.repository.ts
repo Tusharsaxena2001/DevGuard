@@ -31,6 +31,16 @@ export class UsersRepository {
     return this.prisma.user.findMany({ where: { id: { in: [...ids] } }, include: WITH_MEMBERSHIPS });
   }
 
+  /** Emails of active users holding the global security_admin role (project-scoped roles are not evaluated, ADR-014). */
+  public async findActiveAdminEmails(): Promise<string[]> {
+    const rows = await this.prisma.user.findMany({
+      where: { status: "active", memberships: { some: { role: "security_admin", projectId: null } } },
+      select: { email: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map((r) => r.email);
+  }
+
   public list(): Promise<UserRecord[]> {
     return this.prisma.user.findMany({ orderBy: { createdAt: "asc" }, include: WITH_MEMBERSHIPS });
   }

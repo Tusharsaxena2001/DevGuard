@@ -86,6 +86,11 @@ export class DevicesService {
     return toDeviceSummary(record);
   }
 
+  /** Display name of a device, or null when unknown (no actor check: for server-side use such as alert emails). */
+  public async nameById(id: string): Promise<string | null> {
+    return (await this.devices.findById(id))?.name ?? null;
+  }
+
   public async revoke(actor: UserPrincipal, id: string): Promise<DeviceSummary> {
     const record = await this.devices.revoke(id, actor.id, this.clock.now());
     if (record === null) throw notFound();
