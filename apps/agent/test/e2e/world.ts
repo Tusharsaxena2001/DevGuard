@@ -95,7 +95,7 @@ export class World {
   }
 
   /** Protect the work repo: register it and cache a policy for the project. */
-  async protect(over: (p: AgentProject) => void = () => undefined): Promise<void> {
+  async protect(over: (p: AgentProject) => void = () => undefined, cache: { source?: "server" | "local"; fetchedAt?: string } = {}): Promise<void> {
     const project: AgentProject = {
       projectId: "proj-1",
       name: "Portal",
@@ -113,7 +113,7 @@ export class World {
     over(project);
     const store = createFsConfigStore(this.state);
     const root = this.gitOk(["rev-parse", "--show-toplevel"]);
-    await store.writePolicy({ fetchedAt: "2026-06-01T12:00:00.000Z", project });
+    await store.writePolicy({ fetchedAt: cache.fetchedAt ?? "2026-06-01T12:00:00.000Z", project, ...(cache.source === undefined ? {} : { source: cache.source }) });
     await store.writeRepos({ repos: [{ repoPath: root, projectId: "proj-1", registeredAt: "2026-06-01T12:00:00.000Z" }] });
   }
 

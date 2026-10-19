@@ -7,13 +7,15 @@ WORKDIR /repo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/config/package.json packages/config/
 COPY packages/shared/package.json packages/shared/
+COPY packages/policy-engine/package.json packages/policy-engine/
 COPY apps/api/package.json apps/api/
 RUN pnpm install --frozen-lockfile --filter @devguard/api...
 
 COPY packages/config packages/config
 COPY packages/shared packages/shared
+COPY packages/policy-engine packages/policy-engine
 COPY apps/api apps/api
-RUN pnpm --filter @devguard/shared build && pnpm --filter @devguard/api build
+RUN pnpm --filter @devguard/shared build && pnpm --filter @devguard/policy-engine build && pnpm --filter @devguard/api build
 
 USER node
 EXPOSE 3000

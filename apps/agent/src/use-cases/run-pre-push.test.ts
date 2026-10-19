@@ -385,9 +385,60 @@ describe("policy freshness (ADR-004)", () => {
     expect((await w.run(update)).exitCode).toBe(1);
   });
 
-  it("a stricter project still blocks when another matched project is fresh (any one may block)", async () => {
+  it("an expired server policy blocks (single project)", async () => {
     const w = world({ ...server("2026-06-01T10:00:00.000Z"), now: NOW });
     expect((await w.run(update)).exitCode).toBe(1);
+  });
+});
+
+describe("a repo that matches two projects (ADR-003/008: any one may block)", () => {
+  /** proj-1 approves github.com/acme/portal (the default); proj-2 approves only the personal fork. */
+  function twoProjects(modes: { first: "enforce" | "audit_only"; second: "enforce" | "audit_only" }) {
+    const first = cachedPolicy("proj-1");
+    first.project.policy.mode = modes.first;
+    const second = cachedPolicy("proj-2");
+    second.project.policy.mode = modes.second;
+    second.project.policy.destinations = [{ host: "github.com", repoPath: "personal/fork", type: "exact" }];
+    const repos = ok({
+      repos: [
+        { repoPath: "/repo", projectId: "proj-1", registeredAt: "2026-06-01T12:00:00.000Z" },
+        { repoPath: "/repo", projectId: "proj-2", registeredAt: "2026-06-01T12:00:00.000Z" },
+      ],
+    });
+    const events = memoryEvents();
+    const git = fakeGit({ knownObjects: [B], ancestors: [`${B}>${A}`], commits: { [A]: [C1] } });
+    const deps: PrePushDeps = {
+      store: fakeStore({ repos }, { "proj-1": ok(first), "proj-2": ok(second) }),
+      git,
+      events,
+      clock: fixedClock(),
+      newId: sequentialIds("id"),
+      agentVersion: "9.9.9",
+      maxStaleMinutes: 60,
+    };
+    return { run: (url: string) => runPrePush({ remoteName: "origin", remoteUrl: url, stdin: update, cwd: "/repo" }, deps), events };
+  }
+
+  it("blocks when only one enforcing project approves the destination", async () => {
+    const w = twoProjects({ first: "enforce", second: "enforce" });
+    expect((await w.run(OK_URL)).exitCode).toBe(1); // proj-2 does not approve acme/portal
+    expect(w.events.events[0]).toMatchObject({ outcome: "blocked", projectId: "proj-2" });
+    expect((await w.run(OTHER_URL)).exitCode).toBe(1); // proj-1 does not approve the fork
+    expect(w.events.events[1]).toMatchObject({ outcome: "blocked", projectId: "proj-1" });
+  });
+
+  it("an audit-only project cannot relax an enforcing one", async () => {
+    const w = twoProjects({ first: "enforce", second: "audit_only" });
+    expect((await w.run(OTHER_URL)).exitCode).toBe(1); // enforcing proj-1 blocks the fork; audit-only proj-2 approves it
+    expect(w.events.events[0]).toMatchObject({ outcome: "blocked", projectId: "proj-1", mode: "enforce" });
+  });
+
+  it("allows when only audit-only projects are involved, even if one of them would not approve", async () => {
+    const w = twoProjects({ first: "audit_only", second: "audit_only" });
+    const out = await w.run(OK_URL); // proj-2 would not approve acme/portal, but audit-only never blocks
+    expect(out.exitCode).toBe(0);
+    // Known imprecision: the event reports the first matched project, so proj-2's would-have-blocked is not recorded here.
+    expect(w.events.events[0]).toMatchObject({ outcome: "allowed", mode: "audit_only" });
   });
 });
 

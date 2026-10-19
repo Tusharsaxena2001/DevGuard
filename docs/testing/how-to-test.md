@@ -276,7 +276,7 @@ Run one workspace: `pnpm --filter @devguard/api test`. The API tests need `DATAB
 
 ## 6. Known limits of this build (so nothing surprises you)
 
-* Dashboard access is **security admins only**; team-lead and project-owner scoping is deferred ([ADR-014](../decisions/ADR-014-mvp-authorization-scope.md)). Alerts (email, Slack/Teams, in-app inbox) are not built.
+* Dashboard access is **security admins only**; team-lead and project-owner scoping is deferred ([ADR-014](../decisions/ADR-014-mvp-authorization-scope.md)). Alerts are minimal: only email to security admins for blocked pushes and secret/scan-error events (run `docker compose up -d mailpit`, inbox at http://localhost:8025). Slack/Teams, the in-app inbox, per-project recipients, retries and throttling are not built ([ADR-016](../decisions/ADR-016-minimal-email-alerts.md)).
 * An exception stays valid for every push until it expires (up to 72 hours), and needs the server to be reachable at push time.
 * Linux only. Local files are protected by file permissions, not encryption; a local user can read their own device secret.
 * Not covered: browser uploads, USB, email, other Git clients, or pushes that skip the hook.

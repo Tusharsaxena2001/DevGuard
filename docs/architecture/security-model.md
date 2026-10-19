@@ -16,8 +16,17 @@ Accidental pushes via `git push` from a machine where the agent hook is installe
 - Non-Git channels: browser upload, email, USB, cloud sync, copy/paste, screenshots, other Git clients that skip hooks, `git bundle`, patches.
 - Determined malicious insiders. The agent is not tamper-proof.
 - Secrets not matching the minimal detector (ADR-005).
-- Alert delivery guarantees: alerts are best-effort (retries then `failed`); a missed or delayed alert is possible. The dashboard is the record.
+- Alert delivery guarantees: alerts are best-effort. The built slice (ADR-016) is email to security admins only, fire-and-forget with no retries; a missed or delayed alert is possible. The dashboard is the record.
+- Alert flooding: an enrolled device can submit up to 100 blocked events per request and each one mails every admin; there is no per-device cap or digest yet (ADR-016, known risk).
+- Logout clears the browser cookie only; the session is a stateless JWT, so a copied cookie stays valid until it expires (`SESSION_TTL_MINUTES`, default 60). Disabling a user or changing roles takes effect on the next request because both are re-read every time (ADR-014).
+- Exception scope is compared on the normalised host (and port) the agent computes. An exception requested for the `ssh://...:443` form of a host is stored with that port and does not match the https form, and an https-form exception is accepted for an ssh-on-443 push of the same repo. The first fails closed (the exception is unusable); the second is a minor widening across scheme and port for the same host and repo. Not changed in this build.
+- A device-reported fingerprint is only loosely tied to the repo it claims (ADR-008); its effect is to make that device's repo stricter, never looser.
+- When more than one matched project is audit-only, the event records the first project, so another project's "would have blocked" may not appear in that event.
 Missing/removed hooks are detectable only indirectly (device status/last-seen); the dashboard shows hook status when the agent reports it, not proof of absence.
+
+## Development compose stack (not a production deployment)
+`docker compose up -d --build` is for local use. Everything binds to 127.0.0.1. It runs the API with `NODE_ENV=development` (OpenAPI docs at `/docs` without login, session cookie not `Secure`), uses an unpinned Mailpit image whose web inbox has no authentication (it holds alert mail), and builds dev images. TLS is not terminated anywhere; a real deployment needs TLS in front of the dashboard and API, `NODE_ENV=production`, a production image, and `TRUST_PROXY_HOPS` set to the real number of proxies. Alert mail uses TLS only when SMTP credentials are configured (`requireTLS`); an off-host relay without credentials would carry the metadata-only mail in clear text.
+The dashboard's nginx forwards only `/v1/` and `/health`, sends the caller's address (and discards any client-supplied `X-Forwarded-For`) so rate limiting sees real clients, and sets a Content-Security-Policy (`frame-ancestors 'none'`), `X-Content-Type-Options` and `Referrer-Policy`.
 
 ## Threats and mitigations
 | Threat | Mitigation |
@@ -33,7 +42,7 @@ Missing/removed hooks are detectable only indirectly (device status/last-seen); 
 | Tampering with audit history | Append-only audit; no update/delete routes; admin changes attributable |
 | Backend outage | ADR-004: bounded stale policy, then block (enforce) / allow+local record (audit-only) |
 | Webhook URL abused for SSRF / leaked | https + hostname allowlist, DNS/private-range checks, no redirects, encrypted at rest, never returned or logged (ADR-009) |
-| Alert leaks data or reaches wrong people | Recipients resolved server-side by membership; alerts carry metadata only, never contents/secrets |
+| Alert leaks data or reaches wrong people | Built slice: recipients are active global security admins only (looked up server-side); mail carries metadata only (no findings, paths, contents or secrets), with agent-supplied text sanitised. Per-project recipients are not built (ADR-014, ADR-016) |
 | Brute force / enumeration | Rate limits on login/enrollment/ingestion, generic auth errors |
 
 ### Local agent state

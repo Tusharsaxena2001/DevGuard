@@ -170,6 +170,41 @@ describe("protected push through the real global hook", () => {
     expect(w.events().at(-1)).toMatchObject({ outcome: "error", ruleIds: ["policy_unavailable"] });
   });
 
+  describe("a cached server policy older than the staleness limit (ADR-004)", () => {
+    const hoursAgo = (h: number): string => new Date(Date.now() - h * 3_600_000).toISOString();
+
+    it("blocks an enforced protected repo even though the destination is approved; the remote is unchanged", async () => {
+      await w.protect(undefined, { source: "server", fetchedAt: hoursAgo(3) });
+      await installed();
+      w.commit({ "a.txt": "1\n" });
+      const bare = `${w.remotes}/acme/portal.git`;
+      const push = w.git(["push", "origin", "HEAD:refs/heads/main"]);
+      expect(push.status).not.toBe(0);
+      expect(push.stderr).toContain("DevGuard blocked this push");
+      expect(push.stderr).toContain("out of date");
+      expect(w.refsOf(bare)).toBe("");
+      expect(w.events().at(-1)).toMatchObject({ outcome: "blocked", ruleIds: ["policy_unavailable"], mode: "enforce" });
+    });
+
+    it("allows an audit-only repo but records that it would have blocked", async () => {
+      await w.protect((p) => void (p.policy.mode = "audit_only"), { source: "server", fetchedAt: hoursAgo(3) });
+      await installed();
+      const sha = w.commit({ "a.txt": "1\n" });
+      const push = w.git(["push", "origin", "HEAD:refs/heads/main"]);
+      expect(push.status).toBe(0);
+      expect(w.refsOf(`${w.remotes}/acme/portal.git`)).toContain(sha);
+      expect(w.events().at(-1)).toMatchObject({ outcome: "allowed", ruleIds: ["policy_unavailable"], wouldBlock: true, mode: "audit_only" });
+    });
+
+    it("control: the same policy synced just now is used normally", async () => {
+      await w.protect(undefined, { source: "server", fetchedAt: new Date().toISOString() });
+      await installed();
+      const sha = w.commit({ "a.txt": "1\n" });
+      expect(w.git(["push", "origin", "HEAD:refs/heads/main"]).status).toBe(0);
+      expect(w.refsOf(`${w.remotes}/acme/portal.git`)).toContain(sha);
+    });
+  });
+
   it("fails closed when the state directory is writable by others (untrusted)", async () => {
     await w.protect();
     await installed();

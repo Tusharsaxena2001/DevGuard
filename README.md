@@ -2,7 +2,7 @@
 
 Developer security guardrail for company-managed laptops. A managed Git `pre-push` hook blocks pushes of protected repositories to unapproved destinations, scans outgoing commits for prohibited files and high-confidence secrets, and reports events to a central dashboard. Exceptions are scoped, expiring and approved server-side.
 
-> **Status:** hackathon build. The agent (AG-1..8), the API (API-1..7) and a minimal admin dashboard (UI-1..7) are implemented and tested end to end. Not built: alerts (API-8/UI-8) and team-lead scoping ([ADR-014](docs/decisions/ADR-014-mvp-authorization-scope.md)). Status per module: [`docs/plans/module-roadmap.md`](docs/plans/module-roadmap.md).
+> **Status:** hackathon build. The agent (AG-1..8), the API (API-1..7) and a minimal admin dashboard (UI-1..7) are implemented and tested end to end. Alerts are minimal: email to security admins only ([ADR-016](docs/decisions/ADR-016-minimal-email-alerts.md)); the inbox, Slack/Teams (API-8 full, UI-8) and team-lead scoping ([ADR-014](docs/decisions/ADR-014-mvp-authorization-scope.md)) are not built. Status per module: [`docs/plans/module-roadmap.md`](docs/plans/module-roadmap.md).
 >
 > **Running it for a team?** See [`docs/usage.md`](docs/usage.md): install, enroll a laptop to a project, and monitor pushes.
 >
@@ -30,13 +30,22 @@ pnpm install
 pnpm db:up                        # Postgres via Docker Compose on localhost:5433
 docker compose ps                 # wait for "healthy"
 set -a; . ./.env; set +a          # the Prisma CLI and seed read DATABASE_URL from the environment
-pnpm --filter @devguard/shared build
+pnpm --filter @devguard/shared build && pnpm --filter @devguard/policy-engine build
 pnpm --filter @devguard/api prisma:deploy # apply migrations (API-1)
 SEED_PASSWORD='a-12+-character-password' pnpm --filter @devguard/api seed   # synthetic demo users and data, idempotent (without SEED_PASSWORD a random one is printed once)
 pnpm --filter @devguard/api build && pnpm --filter @devguard/api start   # http://localhost:3000, /health, OpenAPI at /docs (or start:dev from source)
 # or run the API in a container: docker compose up -d api   (dev-only image; applies migrations at start)
 pnpm --filter @devguard/dashboard dev     # http://localhost:5173 (proxies /v1 to DEVGUARD_API_URL, default http://localhost:3000)
 ```
+**Or run everything in containers** (dev images, not hardened): after `cp .env.example .env`, run
+```bash
+docker compose up -d --build      # db, mailpit, api (applies migrations at start), dashboard
+set -a; . ./.env; set +a
+pnpm install && pnpm --filter @devguard/shared build
+SEED_PASSWORD='a-12+-character-password' pnpm --filter @devguard/api seed   # the seed runs on the host against localhost:5433
+# dashboard: http://localhost:5173 (nginx proxies /v1 to the api container), API: http://localhost:${API_PORT:-3000}, mail inbox: http://localhost:8025
+```
+Set `API_PORT` in `.env` if 3000 is taken on your machine. `DASHBOARD_BASE_URL` must stay `http://localhost:5173` (the published dashboard origin).
 Stop infra: `pnpm db:down` (add `-v` to `docker compose down` to wipe local data).
 Port note: Postgres is published on **5433** because 5432 is commonly in use; change `POSTGRES_PORT` and `DATABASE_URL` together if needed.
 
@@ -64,7 +73,8 @@ pnpm typecheck && pnpm lint && pnpm test && pnpm build
 ```
 
 ## Alerts
-Blocked pushes and exception requests notify the responsible owner/leads (and security admins for high-severity items) via an in-app inbox, email, and per-project Slack/Teams webhooks. Local dev: `docker compose up -d mailpit` (inbox at http://localhost:8025). Setup for Slack/Teams: [`docs/workflows/alert-channels-setup.md`](docs/workflows/alert-channels-setup.md). Decision: ADR-009.
+Built (minimal, [ADR-016](docs/decisions/ADR-016-minimal-email-alerts.md)): an email to active security admins when a push is blocked in enforce mode or an event has `secret_detected`/`scan_error`. Set `SMTP_HOST` to turn it on (empty = off). Delivery is best-effort: no retries, no throttling (a compromised device can send many mails), failures are logged and dropped. Local dev: `docker compose up -d mailpit` (inbox at http://localhost:8025).
+Not built: in-app inbox, Slack/Teams, owner/lead recipients, exception-request mails, preferences (full design: ADR-009, [`alert-channels-setup.md`](docs/workflows/alert-channels-setup.md)).
 
 ## Architecture docs
 [`component-responsibilities.md`](docs/architecture/component-responsibilities.md) (who owns what) and [`engineering-standards.md`](docs/architecture/engineering-standards.md) (code structure per app).

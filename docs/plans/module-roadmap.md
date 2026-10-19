@@ -32,7 +32,7 @@ Status: `todo` | `in-progress` | `done`. Update via `/implement-module`. Specs: 
 | API-5 | Security events | API-2, API-3 | done |
 | API-6 | Exceptions | API-4, API-5 | done |
 | API-7 | Admin audit + metrics | API-2..6 | done |
-| API-8 | Alerts + notifications (inbox, email, Slack/Teams) | API-2, API-5, API-6 | todo (deferred) |
+| API-8 | Alerts + notifications (inbox, email, Slack/Teams) | API-2, API-5, API-6 | in-progress (minimal email to security admins done, ADR-016; inbox, Slack/Teams, exception mails, retries, throttling deferred) |
 
 ## UI (apps/dashboard)
 | ID | Module | Depends on | Status |
@@ -49,8 +49,8 @@ Status: `todo` | `in-progress` | `done`. Update via `/implement-module`. Specs: 
 ## Cross-cutting
 | ID | Module | Status |
 |----|--------|--------|
-| X-1 | Docker Compose + dev setup | in-progress (Postgres, Mailpit and api compose services done; dashboard service pending) |
-| X-2 | E2E, hardening, demo, limitations | in-progress (how-to-test guide, sandbox script and automated `scripts/e2e-demo.sh` (62 checks) done: `docs/testing/how-to-test.md`; clean-clone run done: setup, 62 e2e checks and all suites pass from a fresh clone) |
+| X-1 | Docker Compose + dev setup | done (db, mailpit, api and dashboard services; `docker compose up -d --build` verified: healthy stack, sign-in and API calls through nginx; API image fixed to build `policy-engine`) |
+| X-2 | E2E, hardening, demo, limitations | done (62-check `scripts/e2e-demo.sh`; security and test review sweeps run and their findings fixed or documented; authorization and redaction sweeps; demo script `docs/workflows/demo-script.md`; bypass and dev-stack limits in `security-model.md`; README limitations) |
 
 ## Build order
 SH-1 -> SH-2/3/4 -> AG-1 -> AG-2 -> AG-3 -> AG-4 (**Gate 1**) -> API-1..3 -> AG-5 -> API-4 -> AG-6 -> API-5 -> AG-7 (**Gate 2**) -> API-6 -> AG-8 -> API-7 -> API-8 -> UI-1..8 (UI-1 may start after API-2) (**Gate 3**) -> X-2 (**Gate 4**).

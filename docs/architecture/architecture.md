@@ -42,4 +42,4 @@ Details: `docs/workflows/`. Data model: `docs/modules/api/API-1-foundation.md`. 
 User, Membership (role + project/team scope), Device, Project, RepoRegistration, ApprovedDestination, Policy, PolicyVersion, ExceptionRequest, ExceptionDecision, SecurityEvent, AdminAuditEvent. Stable UUIDs, timestamps, FKs, unique constraints (e.g. project+normalized destination), enum lifecycle states, indexes on event query fields.
 
 ## Local environment
-`docker compose up -d db` (Postgres, host port 5433). API/dashboard run via pnpm for now; compose services added in X-1. Agent runs natively on the host.
+`docker compose up -d --build` starts Postgres (host port 5433), Mailpit, the API (dev image, applies migrations at start) and the dashboard (nginx serving the Vite build and proxying `/v1` to the API). The API and dashboard can also run via pnpm. The agent is never containerised: it runs natively on the host.
