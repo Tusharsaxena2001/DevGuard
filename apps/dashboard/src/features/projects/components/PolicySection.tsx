@@ -38,7 +38,7 @@ function Editor({ projectId, policy }: { projectId: string; policy: ProjectPolic
       </SelectField>
       <TextArea label="Prohibited file patterns (one per line)" value={globs} onChange={(e) => setGlobs(e.target.value)} />
       <TextArea label="Secret rules (rule ids, one per line)" value={rules} onChange={(e) => setRules(e.target.value)} />
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" busy={update.isPending}>
           Save new version
         </Button>
@@ -60,6 +60,7 @@ export function PolicySection({ projectId }: { projectId: string }): ReactNode {
       <QueryBoundary query={versions} isEmpty={(v) => v.length === 0}>
         {(rows) => (
           <DataTable
+            label="Policy version history"
             rows={rows}
             rowKey={(v) => String(v.version)}
             columns={[

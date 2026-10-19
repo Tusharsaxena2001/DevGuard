@@ -67,7 +67,7 @@ export function OverviewPage(): ReactNode {
         title="Overview"
         subtitle="What DevGuard has seen and decided."
         actions={
-          <div className="w-44">
+          <div className="w-full sm:w-44">
             <SelectField label="Period" value={range} onChange={(e) => setRange(MetricsRangeSchema.parse(e.target.value))}>
               {MetricsRangeSchema.options.map((r) => (
                 <option key={r} value={r}>

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { OutcomeSchema, type Outcome } from "@devguard/shared";
+import { FilterPanel } from "../../../shared/ui/FilterPanel.js";
 import { EventTable } from "../../../shared/ui/EventTable.js";
 import { SelectField, TextField } from "../../../shared/ui/Field.js";
 import { PageHeader } from "../../../shared/ui/PageHeader.js";
@@ -22,7 +23,8 @@ export function EventsPage(): ReactNode {
   return (
     <>
       <PageHeader title="Events" subtitle="Every push attempt the DevGuard hook observed, newest first." />
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <FilterPanel activeCount={[outcome, ruleId.trim(), reference.trim()].filter((v) => v !== "").length}>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <SelectField label="Decision" value={outcome} onChange={(e) => reset(() => setOutcome(e.target.value === "" ? "" : OutcomeSchema.parse(e.target.value)))}>
           <option value="">All</option>
           {OutcomeSchema.options.map((o) => (
@@ -34,6 +36,7 @@ export function EventsPage(): ReactNode {
         <TextField label="Rule" placeholder="e.g. secret_detected" value={ruleId} onChange={(e) => reset(() => setRuleId(e.target.value))} />
         <TextField label="Reference (shown to the developer)" value={reference} onChange={(e) => reset(() => setReference(e.target.value))} />
       </div>
+      </FilterPanel>
       <QueryBoundary query={query} isEmpty={(d) => d.total === 0} emptyTitle="No events match" emptyHint="Events appear when a laptop with the DevGuard agent attempts a push.">
         {(data) => (
           <div className="space-y-3">

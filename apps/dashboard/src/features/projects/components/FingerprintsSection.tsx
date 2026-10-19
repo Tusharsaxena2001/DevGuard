@@ -28,7 +28,7 @@ export function FingerprintsSection({ projectId }: { projectId: string }): React
           Laptops report the first commit of repos they recognise by remote, so a repo is still protected if its remote is changed. Reports are attributed to the device and can be removed here. A wrong entry can only make a repo stricter, never looser.
         </p>
       </div>
-      <form onSubmit={submit} className="flex items-end gap-3">
+      <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
           <TextField label="Add a first-commit hash manually" placeholder="40 hex characters" required value={value} onChange={(e) => setValue(e.target.value)} />
         </div>
@@ -40,6 +40,7 @@ export function FingerprintsSection({ projectId }: { projectId: string }): React
       <QueryBoundary query={fingerprints} isEmpty={(rows) => rows.length === 0} emptyTitle="None yet" emptyHint="They appear after the first push from a recognised repo.">
         {(rows) => (
           <DataTable
+            label="Detected repositories"
             rows={rows}
             rowKey={(r) => r.id}
             columns={[

@@ -19,7 +19,7 @@ export function Button({ variant = "primary", busy = false, disabled, children, 
     <button
       {...rest}
       disabled={disabled === true || busy}
-      className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${STYLES[variant]} ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-9 lg:px-3 lg:py-1.5 ${STYLES[variant]} ${className}`}
     >
       {busy ? "Working..." : children}
     </button>

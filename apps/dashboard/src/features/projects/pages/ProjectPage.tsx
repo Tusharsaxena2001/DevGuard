@@ -39,7 +39,7 @@ export function ProjectPage(): ReactNode {
   return (
     <>
       <p className="mb-2 text-sm">
-        <Link className="text-slate-500 underline" to="/projects">
+        <Link className="inline-flex min-h-11 items-center text-slate-500 underline lg:min-h-0" to="/projects">
           All projects
         </Link>
       </p>

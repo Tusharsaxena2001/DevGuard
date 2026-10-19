@@ -39,7 +39,7 @@ export function UrlListSection({
         <h2 className="font-medium">{title}</h2>
         <p className="text-sm text-slate-500">{hint}</p>
       </div>
-      <form onSubmit={submit} className="flex items-end gap-3">
+      <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
           <TextField label={`Add to ${title.toLowerCase()}`} placeholder="https://github.com/owner/repo or git@host:owner/repo" required value={url} onChange={(e) => setUrl(e.target.value)} />
         </div>
@@ -51,10 +51,11 @@ export function UrlListSection({
       <QueryBoundary query={query} isEmpty={(rows) => rows.length === 0} emptyTitle="None yet">
         {(rows) => (
           <DataTable
+            label={title}
             rows={rows}
             rowKey={(r) => r.id}
             columns={[
-              { header: "Repository (normalised)", cell: (r) => `${r.host}/${r.repoPath}` },
+              { header: "Repository (normalised)", cell: (r) => <span className="break-all">{`${r.host}/${r.repoPath}`}</span> },
               { header: "", cell: (r) => <Button variant="secondary" onClick={() => remove.mutate(r.id)}>Remove</Button> },
             ]}
           />

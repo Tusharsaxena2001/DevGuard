@@ -1,8 +1,70 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens. The UI uses Tailwind's slate scale plus white as its neutral ramp (page = slate-50, surface = white, hairlines
+ * = slate-200, muted text = slate-500, text = slate-900) and emerald/red/amber/sky for status. Dark mode remaps those same
+ * variables, so every component flips without per-component `dark:` classes. Text/background pairs below keep >= 4.5:1.
+ * `data-theme` is set before first paint by `initTheme()` (src/shared/lib/theme.ts).
+ */
 :root {
   color-scheme: light;
 }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-white: #111a2e;
+  --color-slate-50: #0b1220;
+  --color-slate-100: #18233a;
+  --color-slate-200: #243149;
+  --color-slate-300: #3b4c69;
+  --color-slate-400: #7a8aa3;
+  --color-slate-500: #9aa9bf;
+  --color-slate-600: #b4c0d1;
+  --color-slate-700: #cbd5e1;
+  --color-slate-800: #e2e8f0;
+  --color-slate-900: #f1f5f9;
+
+  --color-emerald-50: #0d2b22;
+  --color-emerald-100: #0f3a2c;
+  --color-emerald-200: #14573f;
+  --color-emerald-800: #6ee7b7;
+
+  --color-red-50: #3a161b;
+  --color-red-100: #4a1d22;
+  --color-red-200: #6b2a31;
+  --color-red-500: #fca5a5;
+  --color-red-600: #f87171;
+  --color-red-800: #fca5a5;
+
+  --color-amber-50: #35290c;
+  --color-amber-100: #4a3510;
+  --color-amber-200: #6b4d12;
+  --color-amber-800: #fcd34d;
+
+  --color-sky-100: #0c3a52;
+  --color-sky-800: #7dd3fc;
+}
+
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* One consistent, visible keyboard focus ring (the browser default is thin and low-contrast on dark buttons). */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-slate-900);
+  outline-offset: 2px;
+}
+/* Headings receive programmatic focus on navigation; no ring around them. */
+h1:focus {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

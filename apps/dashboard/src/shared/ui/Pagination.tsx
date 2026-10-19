@@ -4,8 +4,8 @@ import { Button } from "./Button.js";
 export function Pagination({ page, pageSize, total, onPage }: { page: number; pageSize: number; total: number; onPage: (page: number) => void }): ReactNode {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
-    <div className="flex items-center justify-between text-sm text-slate-600">
-      <span>
+    <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+      <span aria-live="polite">
         {total} result{total === 1 ? "" : "s"} - page {page} of {pages}
       </span>
       <span className="flex gap-2">
@@ -16,6 +16,6 @@ export function Pagination({ page, pageSize, total, onPage }: { page: number; pa
           Next
         </Button>
       </span>
-    </div>
+    </nav>
   );
 }

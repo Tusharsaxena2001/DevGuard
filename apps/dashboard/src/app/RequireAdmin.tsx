@@ -10,7 +10,7 @@ import { Layout } from "./Layout.js";
 export function ForbiddenPage({ user }: { user: SessionUser }): ReactNode {
   const logout = useLogout();
   return (
-    <main className="mx-auto mt-24 max-w-md rounded-lg bg-white p-6 ring-1 ring-slate-200">
+    <main className="mx-auto mt-8 max-w-md rounded-lg bg-white p-6 ring-1 ring-slate-200 sm:mt-24">
       <h1 className="text-lg font-semibold">This dashboard is for security administrators</h1>
       <p className="mt-2 text-sm text-slate-600">
         You are signed in as {user.name}, but your account is not a security administrator. Ask one to change what you need, or to approve your exception request. Your laptop keeps protecting your pushes either way.

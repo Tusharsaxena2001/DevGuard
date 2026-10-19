@@ -1,10 +1,14 @@
 import type { ReactNode } from "react";
 import { Button } from "./Button.js";
 
+/** Placeholder bars while data loads. The visible words are for assistive technology only. */
 export function LoadingState({ label = "Loading..." }: { label?: string }): ReactNode {
   return (
-    <div role="status" className="rounded-lg bg-white p-6 text-sm text-slate-500 ring-1 ring-slate-200">
-      {label}
+    <div role="status" aria-busy="true" className="space-y-3 rounded-lg bg-white p-4 ring-1 ring-slate-200">
+      <span className="sr-only">{label}</span>
+      {["w-full", "w-5/6", "w-11/12"].map((w) => (
+        <div key={w} aria-hidden="true" className={`h-4 animate-pulse rounded bg-slate-200 ${w}`} />
+      ))}
     </div>
   );
 }

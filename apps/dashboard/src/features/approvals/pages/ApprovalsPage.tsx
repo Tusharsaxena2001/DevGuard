@@ -95,7 +95,7 @@ export function ApprovalsPage({ me }: { me: string }): ReactNode {
   return (
     <>
       <PageHeader title="Approvals" subtitle="Requests to push a project to a destination that is not approved. Each one is scoped to one project and one destination, and expires." />
-      <div className="mb-4 w-56">
+      <div className="mb-4 w-full sm:w-56">
         <SelectField label="Show" value={status} onChange={(e) => (setStatus(e.target.value === "" ? "" : ExceptionStatusSchema.parse(e.target.value)), setPage(1))}>
           <option value="">All requests</option>
           {ExceptionStatusSchema.options.map((s) => (

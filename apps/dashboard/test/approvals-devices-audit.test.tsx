@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ID, admin, exception, page } from "./data.js";
 import { fakeNetwork, renderApp } from "./helpers.js";
 
@@ -135,17 +135,26 @@ describe("devices", () => {
     expect(net.calledWith("POST", "/v1/devices/enrollment-tokens")[0]?.body).toEqual({ userId: ID.alice });
   });
 
-  it("revokes a device after confirmation, and not without it", async () => {
-    const confirm = vi.spyOn(window, "confirm");
+  it("revokes a device only after the confirmation dialog is accepted; cancelling does nothing", async () => {
     const net = fakeNetwork({ ...session, "GET /v1/devices": { body: [device()] }, "GET /v1/users": { body: people }, [`POST /v1/devices/${ID.device}/revoke`]: { body: device({ status: "revoked" }) } });
     renderApp("/devices", net);
-    confirm.mockReturnValueOnce(false);
+    const revoke = `/v1/devices/${ID.device}/revoke`;
     await userEvent.click(await screen.findByRole("button", { name: "Revoke" }));
-    expect(net.calledWith("POST", `/v1/devices/${ID.device}/revoke`)).toHaveLength(0);
-    confirm.mockReturnValueOnce(true);
+    const dialog = await screen.findByRole("alertdialog", { name: /Revoke .+\?/ });
+    expect(dialog).toHaveTextContent("credentials stop working immediately");
+    // Focus starts on the safe choice, and Cancel (or Escape) closes it without calling the server.
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Revoke" }));
-    await waitFor(() => expect(net.calledWith("POST", `/v1/devices/${ID.device}/revoke`)).toHaveLength(1));
-    confirm.mockRestore();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(net.calledWith("POST", revoke)).toHaveLength(0);
+    // Accepting revokes.
+    await userEvent.click(screen.getByRole("button", { name: "Revoke" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Revoke device" }));
+    await waitFor(() => expect(net.calledWith("POST", revoke)).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
   });
 
   it("adds a person with a password of at least 12 characters", async () => {

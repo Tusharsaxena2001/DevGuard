@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from "react";
 import type { SecurityEventEntry } from "@devguard/shared";
 import { destinationLabel, formatTime } from "../lib/format.js";
+import { useIsDesktop } from "../lib/useMediaQuery.js";
 import { Button } from "./Button.js";
 import { DataTable } from "./DataTable.js";
+import { Sheet } from "./Sheet.js";
 import { StatusBadge } from "./StatusBadge.js";
 
 /**
@@ -12,17 +14,19 @@ import { StatusBadge } from "./StatusBadge.js";
  */
 export function EventTable({ events }: { events: readonly SecurityEventEntry[] }): ReactNode {
   const [open, setOpen] = useState<string | undefined>(undefined);
+  const desktop = useIsDesktop();
   const selected = events.find((e) => e.id === open);
   return (
     <div className="space-y-3">
       <DataTable
+        label="Events"
         rows={events}
         rowKey={(e) => e.id}
         columns={[
-          { header: "When", cell: (e) => formatTime(e.occurredAt) },
+          { header: "When", cell: (e) => formatTime(e.occurredAt), nowrap: true },
           { header: "Who", cell: (e) => `${e.userName} (${e.deviceName})` },
           { header: "Project", cell: (e) => e.projectName ?? "-" },
-          { header: "Destination", cell: (e) => destinationLabel(e.destination) },
+          { header: "Destination", cell: (e) => <span className="break-all">{destinationLabel(e.destination)}</span>, primary: true },
           { header: "Decision", cell: (e) => <StatusBadge value={e.outcome} /> },
           { header: "Rules", cell: (e) => (e.ruleIds.length === 0 ? "-" : e.ruleIds.join(", ")) },
           {
@@ -35,7 +39,13 @@ export function EventTable({ events }: { events: readonly SecurityEventEntry[] }
           },
         ]}
       />
-      {selected === undefined ? null : <EventDetail event={selected} />}
+      {selected === undefined ? null : desktop ? (
+        <EventDetail event={selected} />
+      ) : (
+        <Sheet title="Event details" onClose={() => setOpen(undefined)}>
+          <EventDetail event={selected} />
+        </Sheet>
+      )}
     </div>
   );
 }
@@ -53,11 +63,11 @@ function EventDetail({ event }: { event: SecurityEventEntry }): ReactNode {
     ["Received", formatTime(event.receivedAt)],
   ];
   return (
-    <section aria-label="Event details" className="rounded-lg bg-white p-4 text-sm ring-1 ring-slate-200">
+    <section aria-label="Event details" className="text-sm lg:rounded-lg lg:bg-white lg:p-4 lg:ring-1 lg:ring-slate-200">
       <dl className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
         {rows.map(([k, v]) => (
-          <div key={k} className="flex gap-2">
-            <dt className="w-56 shrink-0 text-slate-500">{k}</dt>
+          <div key={k} className="flex flex-col gap-0.5 sm:flex-row sm:gap-2">
+            <dt className="text-slate-500 sm:w-56 sm:shrink-0">{k}</dt>
             <dd className="break-all">{v}</dd>
           </div>
         ))}

@@ -35,16 +35,18 @@ export function MembersSection({ project }: { project: ProjectSummary }): ReactN
               .filter((u) => u.status === "active")
               .map((u) => (
                 <li key={u.id}>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggle(u.id)} />
-                    {u.name} <span className="text-slate-500">{u.email}</span>
+                  <label className="flex min-h-11 items-center gap-3 rounded-md px-2 text-sm hover:bg-slate-100 lg:min-h-8">
+                    <input type="checkbox" className="size-5 shrink-0 lg:size-4" checked={selected.has(u.id)} onChange={() => toggle(u.id)} />
+                    <span className="min-w-0 break-words">
+                      {u.name} <span className="text-slate-500">{u.email}</span>
+                    </span>
                   </label>
                 </li>
               ))}
           </ul>
         )}
       </QueryBoundary>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button busy={save.isPending} onClick={() => save.mutate([...selected])}>
           Save people
         </Button>

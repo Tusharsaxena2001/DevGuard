@@ -22,7 +22,7 @@ export function LoginPage(): ReactNode {
   const failed = login.error instanceof ApiRequestError && login.error.status === 401 ? "Invalid email or password." : login.isError ? describeError(login.error) : undefined;
 
   return (
-    <main className="mx-auto mt-24 max-w-sm rounded-lg bg-white p-6 ring-1 ring-slate-200">
+    <main className="mx-auto mt-8 max-w-sm rounded-lg bg-white p-6 ring-1 ring-slate-200 sm:mt-24">
       <h1 className="text-lg font-semibold">DevGuard</h1>
       <p className="mt-1 text-sm text-slate-500">Sign in to review pushes, exceptions and policy changes.</p>
       <form onSubmit={submit} className="mt-4 space-y-3">

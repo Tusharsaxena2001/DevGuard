@@ -5,8 +5,10 @@ import { BrowserRouter } from "react-router-dom";
 import { App } from "./app/App.js";
 import { createQueryClient } from "./app/query-client.js";
 import { ApiProvider } from "./shared/api/api-context.js";
+import { initTheme } from "./shared/lib/theme.js";
 import "./index.css";
 
+initTheme();
 const client = createQueryClient();
 const root = document.getElementById("root");
 if (root === null) throw new Error("#root is missing from index.html");
