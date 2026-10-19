@@ -11,5 +11,12 @@
 5. **Server state only through TanStack Query hooks in `features/*/api`.** A 401 anywhere marks the session gone (back to login); signing out or in drops everything cached for the previous person; the one-time enrollment token is shown once and discarded when the page is left.
 6. **Honest wording.** Events and numbers say they show what the hook observed and decided, that decision fields are reported by the agent, and that pushes that skip the hook leave no event.
 
+## Update 2026-10-19: responsive layout, dark mode and accessibility are now in scope
+A mobile audit (`docs/testing/ui-audit.md`) found the desktop-first layout unusable on phones and tablets, so decisions 3 and "not built" are amended:
+- **Responsive:** below 1024px (`lg`) the shell is a top bar with a drawer menu and tables become card lists; from 1024px it is a sticky sidebar and real tables. Touch targets are at least 44px below 1024px. No page-level horizontal scroll at 360px and up.
+- **Dark mode:** light, dark and system, chosen with a toggle and remembered per browser. It is implemented by remapping the Tailwind neutral and status colour variables in `src/index.css` (design tokens), so components carry no `dark:` classes. Text keeps at least 4.5:1 contrast in both themes.
+- **Accessibility basics:** skip link, a title per page, focus moved to the page heading after navigation, focus-trapped drawer, dialogs and sheets, per-field error messages, a visible focus ring.
+- Components are still hand-written (no shadcn CLI, no new runtime dependency).
+
 ## Not built
-UI-8 (notifications and alert settings, needs API-8), employee self-service views, dark mode, charts (numbers and tables only), pagination beyond simple page controls, and an in-app policy diff.
+UI-8 (notifications and alert settings, needs API-8), employee self-service views, charts (numbers and tables only), pagination beyond simple page controls, and an in-app policy diff.

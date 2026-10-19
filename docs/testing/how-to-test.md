@@ -32,6 +32,9 @@ It prints `PASS`/`FAIL` per check, a summary, and exits non-zero on any failure 
 5. **Devices**: issue a token (shown once), revoke a device.
 6. **Approvals**: with a pending request, review it as `admin2@example.test`; approve; revoke.
 7. **Audit**: each change above appears, with who did it.
+8. **Phone and tablet** (resize the window or use device emulation at 360x640, 390x844, 768x1024, 844x390): no sideways scrolling of the page; **Menu** opens a drawer (Escape closes it); Events, Audit and Devices show cards with their buttons reachable; **Details** opens a bottom sheet; the Filters toggle works; buttons and fields are comfortable to tap.
+9. **Dark mode**: **Theme** in the menu cycles System, Light, Dark; text stays readable on every page.
+10. **Devices**: **Copy token** and **Copy command** work; **Revoke** asks in a dialog that names the device (Escape cancels). **Add a person** with empty fields shows a message under each field.
 
 Automated UI coverage remains the dashboard component tests (`pnpm --filter @devguard/dashboard test`); the MCP run is interactive verification, not a CI suite.
 
