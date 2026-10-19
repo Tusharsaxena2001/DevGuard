@@ -6,6 +6,8 @@ Developer security guardrail for company-managed laptops. A managed Git `pre-pus
 >
 > **Running it for a team?** See [`docs/usage.md`](docs/usage.md): install, enroll a laptop to a project, and monitor pushes.
 >
+> **What does the laptop tool look like, and how is it installed?** [`docs/laptop-tool.md`](docs/laptop-tool.md): it is a CLI plus a Git hook (no GUI yet), installed from the repository today.
+>
 > **Automated check:** `pnpm e2e:demo -- --port 3931` runs the whole flow end to end and prints PASS/FAIL.
 >
 > **Want to try it?** Follow [`docs/testing/how-to-test.md`](docs/testing/how-to-test.md): setup, a throwaway sandbox "laptop", and a walkthrough of every flow (block, secret, exception, offline, audit).

@@ -21,7 +21,7 @@ Protection is configured in the dashboard, not on the laptop. A repo is protecte
 
 ## 1. Install the tool on a laptop
 
-There is no published package yet; you install from this repository. Requirements: Node 22+, pnpm 10+, Git 2.30+.
+There is no published package yet; you install from this repository. What the tool looks like to a developer, and the options for packaging it later, are in [laptop-tool.md](laptop-tool.md). Requirements: Node 22+, pnpm 10+, Git 2.30+.
 
 ```bash
 git clone <this repository> && cd dev-guard
