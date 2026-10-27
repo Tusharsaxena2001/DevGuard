@@ -6,5 +6,5 @@
 - Security-critical parsing (URLs, policies, hook input) returns a discriminated result (`{ ok: true, ... } | { ok: false, reason }`) rather than throwing, and callers must handle `ok: false` as deny.
 - Prefer named exports, small pure functions, explicit return types on exported functions.
 - ESM modules, Node >= 22. No default exports except where a framework requires them.
-- Match surrounding style; formatting is enforced by Prettier/ESLint, not by hand.
+- Match surrounding style (2-space indent, double quotes, as in neighbouring files). ESLint is the only enforced tool; there is no Prettier setup.
 - Time and randomness are injected in domain code (`now: Date`) for deterministic tests.

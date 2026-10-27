@@ -57,6 +57,7 @@ Admins and team leads configure everything in the dashboard: projects, classific
 ## Agent quick start
 ```bash
 pnpm --filter @devguard/agent build              # `devguard` = node apps/agent/dist/main.js
+mkdir -p ~/.local/bin && ln -sf "$PWD/apps/agent/dist/main.js" ~/.local/bin/devguard   # puts `devguard` on PATH (see docs/usage.md)
 echo '<token>' | devguard enroll --server <url> --token-stdin   # once per laptop; installs the global hook and syncs
 devguard status [--check-server]                 # enrollment, hook state, cached policies, pending events
 devguard sync                                    # refresh policies; also delivers queued events

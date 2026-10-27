@@ -8,6 +8,8 @@ These automate **development with Claude Code**. They are unrelated to the produ
 |-------|---------|--------|---------|
 | PreToolUse | `Write\|Edit` | `block-secret-files.sh` | Blocks writing `.env`, `.env.*` (except `.env.example`), `*.pem`, `*.key`, SSH private key names. Exit 2 blocks and shows stderr to Claude. Fails open on unparseable input (convenience guard, not a security control). |
 
+`.claude/settings.json` also carries `permissions.deny` rules that stop Claude from reading `.env`, `.env.local`, `.env.production`, `*.pem` and `*.key` files. Neither the hook nor the deny rules cover shell commands such as `echo > .env`; they are guardrails against accidents, not a security boundary.
+
 Contract: hook receives JSON on stdin (`tool_input.file_path`); exit 0 = allow, exit 2 = block with stderr feedback.
 
 Test it:

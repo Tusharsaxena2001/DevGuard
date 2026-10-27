@@ -21,7 +21,7 @@ services:
 
   # Local SMTP catch-all for alert emails (ADR-009). Nothing is delivered externally.
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.31.6
     restart: unless-stopped
     ports:
       - "127.0.0.1:1025:1025"   # SMTP

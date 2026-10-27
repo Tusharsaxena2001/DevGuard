@@ -2,7 +2,7 @@
 
 Developer security guardrail for company-managed laptops. A managed Git `pre-push` hook (endpoint agent) blocks pushes of protected repos to unapproved destinations, scans outgoing commits for prohibited files and secrets, and reports events to a central API/dashboard. Exceptions are scoped, expiring and approved server-side.
 
-**Status:** documentation/scaffolding phase. Application code is implemented module by module (see `docs/plans/module-roadmap.md`). Do not implement beyond the module you were asked to.
+**Status:** agent, API, dashboard and shared packages are implemented; the alerts module (API-8) is a minimal slice and UI-8 is deferred. Current per-module status is in `docs/plans/module-roadmap.md`. Implement module by module and do not go beyond the module you were asked to.
 
 ## MVP scope (three capabilities)
 - **A. Git protection:** enroll device once; global managed `pre-push` hook; repos auto-matched to dashboard-defined projects; block unapproved destinations, scan outgoing history, audit-only mode.
@@ -15,17 +15,17 @@ Developer security guardrail for company-managed laptops. A managed Git `pre-pus
 ```
 apps/agent       Node/TS CLI `devguard` (hook install, pre-push runner, enrollment, sync)
 apps/api         NestJS + Prisma + PostgreSQL (authoritative policy, events, approvals)
-apps/dashboard   React + Vite + Tailwind + shadcn/ui
+apps/dashboard   React + Vite + Tailwind (hand-written components, ADR-015)
 packages/shared         Zod contracts, enums, roles, event/decision types
 packages/policy-engine  Pure deterministic policy logic (no I/O frameworks)
-packages/config         Shared tsconfig / eslint / vitest config
+packages/config         Shared tsconfig base (ESLint config lives in the root eslint.config.js)
 docs/            product, architecture, modules/{shared,agent,api,ui}, workflows, security, plans, decisions
 .claude/         rules, skills, agents, hooks, workflows, settings.json
 ```
 pnpm-workspaces monorepo. Dev infrastructure via Docker Compose (Postgres on host port **5433**).
 
 ## Commands
-Run from repo root. Commands marked * work only after the owning module exists.
+Run from repo root. Commands marked * need the owning module's prerequisites (database up, `.env` loaded).
 ```
 pnpm install                 # install all workspaces
 cp .env.example .env         # then edit placeholders locally

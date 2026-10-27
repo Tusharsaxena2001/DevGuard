@@ -42,7 +42,7 @@ Rules: the pre-push runner never imports commander; Git is reached only through 
 ```
 src/app/                   router, providers, auth/role guard, layout
 src/features/<feature>/    api/ (TanStack Query hooks over the typed client), components/, pages/
-src/shared/ui/             shadcn components; DataTable, StatusBadge, EmptyState, ErrorState, LoadingState
+src/shared/ui/             small hand-written Tailwind components (ADR-015); DataTable, StatusBadge, EmptyState, ErrorState, LoadingState
 src/shared/lib/            api client, formatting
 ```
 Rules: pages compose, components are presentational; server state only via query hooks in `features/*/api`; no business or security rules in components (role-aware UI is convenience, the API enforces); features do not import each other (promote shared pieces to `shared/`).
